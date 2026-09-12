@@ -1,27 +1,35 @@
 import { StockMovement, Product, sequelize } from '../models/index.js';
+import { asyncHandler } from '../utils/asyncHandler.js';
 
-export const getMovementsByProduct = async (req, res) => {
-  try {
-    const { productId } = req.params;
-    const movements = await StockMovement.findAll({
-      where: { productId },
-      order: [['date', 'DESC']],
-    });
-    res.json(movements);
-  } catch (error) {
-    res.status(500).json({ message: 'Error fetching stock movements', error: error.message });
+export const getMovementsByProduct = asyncHandler(async (req, res) => {
+  const { productId } = req.params;
+  const product = await Product.findOne({ where: { id: productId, businessId: req.user.businessId } });
+  if (!product) {
+    const error = new Error('Product not found');
+    error.status = 404;
+    throw error;
   }
-};
 
-export const createStockMovement = async (req, res) => {
+  const movements = await StockMovement.findAll({
+    where: { productId },
+    order: [['date', 'DESC']],
+  });
+  res.json(movements);
+});
+
+export const createStockMovement = asyncHandler(async (req, res) => {
   const { productId, type, quantity, reason, newStock } = req.body;
 
   const t = await sequelize.transaction();
   try {
-    const product = await Product.findByPk(productId, { transaction: t });
+    const product = await Product.findOne({
+      where: { id: productId, businessId: req.user.businessId },
+      transaction: t,
+    });
     if (!product) {
-      await t.rollback();
-      return res.status(404).json({ message: 'Product not found' });
+      const error = new Error('Product not found');
+      error.status = 404;
+      throw error;
     }
 
     let delta;
@@ -31,15 +39,16 @@ export const createStockMovement = async (req, res) => {
     } else if (type === 'out') {
       delta = -Math.abs(quantity);
       if (product.stock + delta < 0) {
-        await t.rollback();
-        return res.status(400).json({ message: 'Stock insuficiente para este egreso' });
+        const error = new Error('Stock insuficiente para este egreso');
+        error.status = 400;
+        throw error;
       }
     } else if (type === 'adjustment') {
-      // acá quantity no se usa: se manda el stock real contado, y calculamos la diferencia
       delta = newStock - product.stock;
     } else {
-      await t.rollback();
-      return res.status(400).json({ message: 'Tipo de movimiento inválido' });
+      const error = new Error('Tipo de movimiento inválido');
+      error.status = 400;
+      throw error;
     }
 
     const movement = await StockMovement.create({
@@ -56,6 +65,6 @@ export const createStockMovement = async (req, res) => {
     res.status(201).json({ movement, newStock: product.stock });
   } catch (error) {
     await t.rollback();
-    res.status(400).json({ message: 'Error creating stock movement', error: error.message });
+    throw error;
   }
-};
+});
