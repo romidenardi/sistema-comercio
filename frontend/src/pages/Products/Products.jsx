@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Fragment } from 'react';
 import { useForm } from 'react-hook-form';
 import { useResource } from '../../hooks/useResource.js';
 import * as productsApi from '../../api/products.api.js';
@@ -143,8 +143,8 @@ const Products = () => {
         </thead>
         <tbody>
           {products.map((product) => (
-            <>
-              <tr key={product.id}>
+            <Fragment key={product.id}>
+              <tr>
                 {editingId === product.id ? (
                   <td colSpan={5}>
                     <form onSubmit={editForm.handleSubmit(onUpdate)} className="product-edit-form">
@@ -184,7 +184,7 @@ const Products = () => {
                   </td>
                 </tr>
               )}
-            </>
+            </Fragment>
           ))}
         </tbody>
       </table>
