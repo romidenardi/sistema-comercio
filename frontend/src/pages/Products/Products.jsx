@@ -1,19 +1,21 @@
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import {
-  getProducts,
-  createProduct,
-  updateProduct,
-  deleteProduct,
-} from '../../api/products.api.js';
+import { useResource } from '../../hooks/useResource.js';
+import * as productsApi from '../../api/products.api.js';
 import { getCategories } from '../../api/categories.api.js';
 import StockMovementPanel from '../../components/common/StockMovementPanel.jsx';
+import Spinner from '../../components/common/Spinner.jsx';
+
+const api = {
+  getAll: productsApi.getProducts,
+  create: productsApi.createProduct,
+  update: productsApi.updateProduct,
+  remove: productsApi.deleteProduct,
+};
 
 const Products = () => {
-  const [products, setProducts] = useState([]);
+  const { items: products, loading, create, update, remove, reload } = useResource(api);
   const [categories, setCategories] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [editingId, setEditingId] = useState(null);
   const [stockPanelId, setStockPanelId] = useState(null);
 
@@ -22,45 +24,22 @@ const Products = () => {
   });
   const editForm = useForm();
 
-  const loadData = async () => {
-    setLoading(true);
-    try {
-      const [productsRes, categoriesRes] = await Promise.all([getProducts(), getCategories()]);
-      setProducts(productsRes.data);
-      setCategories(categoriesRes.data);
-    } catch (err) {
-      setError('No se pudieron cargar los productos');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    loadData();
+    getCategories().then(({ data }) => setCategories(data));
   }, []);
 
-  // aplana categorías + subcategorías para el dropdown
-  const flatCategories = categories.flatMap((c) => [
-    c,
-    ...(c.subcategories || []),
-  ]);
+  const flatCategories = categories.flatMap((c) => [c, ...(c.subcategories || [])]);
 
   const onCreate = async (formData) => {
-    try {
-      await createProduct({
-        ...formData,
-        price: Number(formData.price),
-        cost: Number(formData.cost),
-        promoPrice: formData.promoPrice ? Number(formData.promoPrice) : null,
-        vatRate: Number(formData.vatRate),
-        categoryId: formData.categoryId || null,
-      });
-      reset({ unitType: 'unit', vatRate: 21 });
-      loadData();
-    } catch (err) {
-      const msg = err.response?.data?.errors?.[0]?.msg || err.response?.data?.message;
-      setError(msg || 'Error al crear el producto');
-    }
+    const result = await create({
+      ...formData,
+      price: Number(formData.price),
+      cost: Number(formData.cost),
+      promoPrice: formData.promoPrice ? Number(formData.promoPrice) : null,
+      vatRate: Number(formData.vatRate),
+      categoryId: formData.categoryId || null,
+    });
+    if (result.success) reset({ unitType: 'unit', vatRate: 21 });
   };
 
   const startEdit = (product) => {
@@ -70,46 +49,27 @@ const Products = () => {
   };
 
   const onUpdate = async (formData) => {
-    try {
-      await updateProduct(editingId, {
-        ...formData,
-        price: Number(formData.price),
-        cost: Number(formData.cost),
-        promoPrice: formData.promoPrice ? Number(formData.promoPrice) : null,
-      });
-      setEditingId(null);
-      loadData();
-    } catch (err) {
-      setError('Error al actualizar el producto');
-    }
+    const result = await update(editingId, {
+      ...formData,
+      price: Number(formData.price),
+      cost: Number(formData.cost),
+      promoPrice: formData.promoPrice ? Number(formData.promoPrice) : null,
+    });
+    if (result.success) setEditingId(null);
   };
 
-  const onDelete = async (id) => {
-    if (!confirm('¿Eliminar este producto?')) return;
-    try {
-      await deleteProduct(id);
-      loadData();
-    } catch (err) {
-      setError('Error al eliminar el producto');
-    }
-  };
-
-  const handleStockChange = (productId, newStock) => {
-    setProducts((prev) =>
-      prev.map((p) => (p.id === productId ? { ...p, stock: newStock } : p))
-    );
+  const onDelete = (id) => {
+    if (confirm('¿Eliminar este producto?')) remove(id);
   };
 
   const categoryName = (categoryId) =>
     flatCategories.find((c) => c.id === categoryId)?.name || '—';
 
-  if (loading) return <p>Cargando productos...</p>;
+  if (loading) return <Spinner label="Cargando productos..." />;
 
   return (
     <div className="products-page">
       <h1>Productos</h1>
-
-      {error && <p className="error">{error}</p>}
 
       <form onSubmit={handleSubmit(onCreate)} className="product-form">
         <input
@@ -220,10 +180,7 @@ const Products = () => {
               {stockPanelId === product.id && (
                 <tr>
                   <td colSpan={6}>
-                    <StockMovementPanel
-                      product={product}
-                      onStockChange={(newStock) => handleStockChange(product.id, newStock)}
-                    />
+                    <StockMovementPanel product={product} onStockChange={reload} />
                   </td>
                 </tr>
               )}

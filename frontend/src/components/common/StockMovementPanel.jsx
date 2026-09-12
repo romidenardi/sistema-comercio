@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { getMovementsByProduct, createStockMovement } from '../../api/stockMovements.api.js';
+import { useToast } from '../../context/ToastContext.jsx';
+import Spinner from './Spinner.jsx';
 
 const StockMovementPanel = ({ product, onStockChange }) => {
   const [movements, setMovements] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const { showToast } = useToast();
   const { register, handleSubmit, watch, reset } = useForm({ defaultValues: { type: 'in' } });
 
   const type = watch('type');
@@ -16,7 +18,7 @@ const StockMovementPanel = ({ product, onStockChange }) => {
       const { data } = await getMovementsByProduct(product.id);
       setMovements(data);
     } catch (err) {
-      setError('No se pudo cargar el historial');
+      showToast('No se pudo cargar el historial', 'error');
     } finally {
       setLoading(false);
     }
@@ -34,20 +36,20 @@ const StockMovementPanel = ({ product, onStockChange }) => {
       } else {
         payload.quantity = Number(formData.value);
       }
-      const { data } = await createStockMovement(payload);
+      await createStockMovement(payload);
       reset({ type: 'in' });
       loadMovements();
-      onStockChange(data.newStock);
+      showToast('Movimiento registrado');
+      onStockChange();
     } catch (err) {
-      setError(err.response?.data?.message || 'Error al registrar el movimiento');
+      const message = err.response?.data?.message || 'Error al registrar el movimiento';
+      showToast(message, 'error');
     }
   };
 
   return (
     <div className="stock-panel">
       <h3>Stock actual: {product.stock}</h3>
-
-      {error && <p className="error">{error}</p>}
 
       <form onSubmit={handleSubmit(onSubmit)} className="stock-form">
         <select {...register('type')}>
@@ -68,7 +70,7 @@ const StockMovementPanel = ({ product, onStockChange }) => {
       </form>
 
       {loading ? (
-        <p>Cargando historial...</p>
+        <Spinner label="Cargando historial..." />
       ) : (
         <table>
           <thead>
