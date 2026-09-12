@@ -1,6 +1,7 @@
 import { Routes, Route } from 'react-router-dom';
 import Login from '../pages/Login/Login.jsx';
 import Categories from '../pages/Categories/Categories.jsx';
+import Payments from '../pages/Payments/Payments.jsx';
 import PrivateRoute from './PrivateRoute.jsx';
 import Layout from '../components/layout/Layout.jsx';
 
@@ -13,7 +14,8 @@ const AppRoutes = () => {
         <Route element={<Layout />}>
           <Route path="/" element={<div>Bienvenida</div>} />
           <Route path="/categories" element={<Categories />} />
-          {/* acá van a colgar Products, Customers, Payments */}
+          <Route path="/payments" element={<Payments />} />
+          {/* acá van a colgar Products, Customers */}
         </Route>
       </Route>
     </Routes>
