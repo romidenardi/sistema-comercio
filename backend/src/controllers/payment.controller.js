@@ -1,50 +1,40 @@
 import { Payment } from '../models/index.js';
+import { asyncHandler } from '../utils/asyncHandler.js';
 
-export const getPayments = async (req, res) => {
-  try {
-    const payments = await Payment.findAll();
-    res.json(payments);
-  } catch (error) {
-    res.status(500).json({ message: 'Error fetching payments', error: error.message });
-  }
-};
+export const getPayments = asyncHandler(async (req, res) => {
+  const payments = await Payment.findAll({ where: { businessId: req.user.businessId } });
+  res.json(payments);
+});
 
-export const createPayment = async (req, res) => {
-  try {
-    const { name } = req.body;
-    if (!name) {
-      return res.status(400).json({ message: 'El nombre es obligatorio' });
-    }
-    const payment = await Payment.create({
-      name,
-      businessId: process.env.BUSINESS_ID_DEFAULT,
-    });
-    res.status(201).json(payment);
-  } catch (error) {
-    res.status(400).json({ message: 'Error creating payment', error: error.message });
-  }
-};
+export const createPayment = asyncHandler(async (req, res) => {
+  const { name } = req.body;
+  const payment = await Payment.create({
+    name,
+    businessId: req.user.businessId,
+  });
+  res.status(201).json(payment);
+});
 
-export const updatePayment = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const payment = await Payment.findByPk(id);
-    if (!payment) return res.status(404).json({ message: 'Payment not found' });
-    await payment.update(req.body);
-    res.json(payment);
-  } catch (error) {
-    res.status(400).json({ message: 'Error updating payment', error: error.message });
+export const updatePayment = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const payment = await Payment.findOne({ where: { id, businessId: req.user.businessId } });
+  if (!payment) {
+    const error = new Error('Payment not found');
+    error.status = 404;
+    throw error;
   }
-};
+  await payment.update(req.body);
+  res.json(payment);
+});
 
-export const deletePayment = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const payment = await Payment.findByPk(id);
-    if (!payment) return res.status(404).json({ message: 'Payment not found' });
-    await payment.destroy();
-    res.status(204).send();
-  } catch (error) {
-    res.status(500).json({ message: 'Error deleting payment', error: error.message });
+export const deletePayment = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const payment = await Payment.findOne({ where: { id, businessId: req.user.businessId } });
+  if (!payment) {
+    const error = new Error('Payment not found');
+    error.status = 404;
+    throw error;
   }
-};
+  await payment.destroy();
+  res.status(204).send();
+});
