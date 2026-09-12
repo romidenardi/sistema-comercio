@@ -3,6 +3,7 @@ import Login from '../pages/Login/Login.jsx';
 import Categories from '../pages/Categories/Categories.jsx';
 import Payments from '../pages/Payments/Payments.jsx';
 import Customers from '../pages/Customers/Customers.jsx';
+import Products from '../pages/Products/Products.jsx';
 import PrivateRoute from './PrivateRoute.jsx';
 import Layout from '../components/layout/Layout.jsx';
 
@@ -17,7 +18,7 @@ const AppRoutes = () => {
           <Route path="/categories" element={<Categories />} />
           <Route path="/payments" element={<Payments />} />
           <Route path="/customers" element={<Customers />} />
-          {/* acá va a colgar Products */}
+          <Route path="/products" element={<Products />} />
         </Route>
       </Route>
     </Routes>
