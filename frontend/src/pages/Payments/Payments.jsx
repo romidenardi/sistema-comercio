@@ -1,45 +1,26 @@
-import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
-import {
-  getPayments,
-  createPayment,
-  updatePayment,
-  deletePayment,
-} from '../../api/payments.api.js';
+import { useResource } from '../../hooks/useResource.js';
+import * as paymentsApi from '../../api/payments.api.js';
+import Spinner from '../../components/common/Spinner.jsx';
+import { useState } from 'react';
+
+const api = {
+  getAll: paymentsApi.getPayments,
+  create: paymentsApi.createPayment,
+  update: paymentsApi.updatePayment,
+  remove: paymentsApi.deletePayment,
+};
 
 const Payments = () => {
-  const [payments, setPayments] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const { items: payments, loading, create, update, remove } = useResource(api);
   const [editingId, setEditingId] = useState(null);
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm();
   const editForm = useForm();
 
-  const loadPayments = async () => {
-    setLoading(true);
-    try {
-      const { data } = await getPayments();
-      setPayments(data);
-    } catch (err) {
-      setError('No se pudieron cargar las formas de pago');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadPayments();
-  }, []);
-
   const onCreate = async (formData) => {
-    try {
-      await createPayment({ name: formData.name });
-      reset();
-      loadPayments();
-    } catch (err) {
-      setError(err.response?.data?.message || 'Error al crear la forma de pago');
-    }
+    const result = await create({ name: formData.name });
+    if (result.success) reset();
   };
 
   const startEdit = (payment) => {
@@ -48,41 +29,21 @@ const Payments = () => {
   };
 
   const onUpdateName = async (formData) => {
-    try {
-      await updatePayment(editingId, { name: formData.name });
-      setEditingId(null);
-      loadPayments();
-    } catch (err) {
-      setError('Error al actualizar la forma de pago');
-    }
+    const result = await update(editingId, { name: formData.name });
+    if (result.success) setEditingId(null);
   };
 
-  const toggleActive = async (payment) => {
-    try {
-      await updatePayment(payment.id, { active: !payment.active });
-      loadPayments();
-    } catch (err) {
-      setError('Error al cambiar el estado');
-    }
+  const toggleActive = (payment) => update(payment.id, { active: !payment.active });
+
+  const onDelete = (id) => {
+    if (confirm('¿Eliminar esta forma de pago definitivamente?')) remove(id);
   };
 
-  const onDelete = async (id) => {
-    if (!confirm('¿Eliminar esta forma de pago definitivamente?')) return;
-    try {
-      await deletePayment(id);
-      loadPayments();
-    } catch (err) {
-      setError('Error al eliminar la forma de pago');
-    }
-  };
-
-  if (loading) return <p>Cargando formas de pago...</p>;
+  if (loading) return <Spinner label="Cargando formas de pago..." />;
 
   return (
     <div className="payments-page">
       <h1>Formas de pago</h1>
-
-      {error && <p className="error">{error}</p>}
 
       <form onSubmit={handleSubmit(onCreate)} className="payment-form">
         <input

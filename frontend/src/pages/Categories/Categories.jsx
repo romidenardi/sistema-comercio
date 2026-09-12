@@ -1,48 +1,31 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import {
-  getCategories,
-  createCategory,
-  updateCategory,
-  deleteCategory,
-} from '../../api/categories.api.js';
+import { useResource } from '../../hooks/useResource.js';
+import * as categoriesApi from '../../api/categories.api.js';
+import Spinner from '../../components/common/Spinner.jsx';
+
+const api = {
+  getAll: categoriesApi.getCategories,
+  create: categoriesApi.createCategory,
+  update: categoriesApi.updateCategory,
+  remove: categoriesApi.deleteCategory,
+};
 
 const Categories = () => {
-  const [categories, setCategories] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const { items: categories, loading, create, update, remove } = useResource(api);
   const [editingId, setEditingId] = useState(null);
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm();
   const editForm = useForm();
 
-  const loadCategories = async () => {
-    setLoading(true);
-    try {
-      const { data } = await getCategories();
-      setCategories(data);
-    } catch (err) {
-      setError('No se pudieron cargar las categorías');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadCategories();
-  }, []);
+  const topLevelCategories = categories.filter((c) => !c.parentId);
 
   const onCreate = async (formData) => {
-    try {
-      await createCategory({
-        name: formData.name,
-        parentId: formData.parentId || null,
-      });
-      reset();
-      loadCategories();
-    } catch (err) {
-      setError(err.response?.data?.message || 'Error al crear la categoría');
-    }
+    const result = await create({
+      name: formData.name,
+      parentId: formData.parentId || null,
+    });
+    if (result.success) reset();
   };
 
   const startEdit = (category) => {
@@ -51,35 +34,19 @@ const Categories = () => {
   };
 
   const onUpdate = async (formData) => {
-    try {
-      await updateCategory(editingId, { name: formData.name });
-      setEditingId(null);
-      loadCategories();
-    } catch (err) {
-      setError(err.response?.data?.message || 'Error al actualizar la categoría');
-    }
+    const result = await update(editingId, { name: formData.name });
+    if (result.success) setEditingId(null);
   };
 
-  const onDelete = async (id) => {
-    if (!confirm('¿Eliminar esta categoría?')) return;
-    try {
-      await deleteCategory(id);
-      loadCategories();
-    } catch (err) {
-      setError('Error al eliminar la categoría');
-    }
+  const onDelete = (id) => {
+    if (confirm('¿Eliminar esta categoría?')) remove(id);
   };
 
-  // solo categorías de primer nivel para el dropdown de "padre"
-  const topLevelCategories = categories.filter((c) => !c.parentId);
-
-  if (loading) return <p>Cargando categorías...</p>;
+  if (loading) return <Spinner label="Cargando categorías..." />;
 
   return (
     <div className="categories-page">
       <h1>Categorías</h1>
-
-      {error && <p className="error">{error}</p>}
 
       <form onSubmit={handleSubmit(onCreate)} className="category-form">
         <input

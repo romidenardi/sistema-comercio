@@ -1,11 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import {
-  getCustomers,
-  createCustomer,
-  updateCustomer,
-  deleteCustomer,
-} from '../../api/customers.api.js';
+import { useResource } from '../../hooks/useResource.js';
+import * as customersApi from '../../api/customers.api.js';
+import Spinner from '../../components/common/Spinner.jsx';
+
+const api = {
+  getAll: customersApi.getCustomers,
+  create: customersApi.createCustomer,
+  update: customersApi.updateCustomer,
+  remove: customersApi.deleteCustomer,
+};
 
 const FISCAL_CONDITIONS = [
   'Consumidor Final',
@@ -15,52 +19,29 @@ const FISCAL_CONDITIONS = [
 ];
 
 const Customers = () => {
-  const [customers, setCustomers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const { items: customers, loading, create, update, remove } = useResource(api);
   const [editingId, setEditingId] = useState(null);
-  const [personType, setPersonType] = useState('individual'); // individual | business
+  const [personType, setPersonType] = useState('individual');
 
-  const { register, handleSubmit, reset, watch, formState: { errors } } = useForm();
+  const { register, handleSubmit, reset, formState: { errors } } = useForm();
   const editForm = useForm();
 
-  const loadCustomers = async () => {
-    setLoading(true);
-    try {
-      const { data } = await getCustomers();
-      setCustomers(data);
-    } catch (err) {
-      setError('No se pudieron cargar los clientes');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadCustomers();
-  }, []);
-
   const onCreate = async (formData) => {
-    try {
-      const payload = {
-        fiscalCondition: formData.fiscalCondition,
-        cuit: formData.cuit || null,
-        address: formData.address || null,
-        zipCode: formData.zipCode || null,
-        city: formData.city || null,
-        province: formData.province || null,
-        phone: formData.phone || null,
-        email: formData.email || null,
-        ...(personType === 'business'
-          ? { businessName: formData.businessName }
-          : { firstName: formData.firstName, lastName: formData.lastName }),
-      };
-      await createCustomer(payload);
-      reset();
-      loadCustomers();
-    } catch (err) {
-      setError(err.response?.data?.message || 'Error al crear el cliente');
-    }
+    const payload = {
+      fiscalCondition: formData.fiscalCondition,
+      cuit: formData.cuit || null,
+      address: formData.address || null,
+      zipCode: formData.zipCode || null,
+      city: formData.city || null,
+      province: formData.province || null,
+      phone: formData.phone || null,
+      email: formData.email || null,
+      ...(personType === 'business'
+        ? { businessName: formData.businessName }
+        : { firstName: formData.firstName, lastName: formData.lastName }),
+    };
+    const result = await create(payload);
+    if (result.success) reset();
   };
 
   const startEdit = (customer) => {
@@ -69,34 +50,21 @@ const Customers = () => {
   };
 
   const onUpdate = async (formData) => {
-    try {
-      await updateCustomer(editingId, formData);
-      setEditingId(null);
-      loadCustomers();
-    } catch (err) {
-      setError('Error al actualizar el cliente');
-    }
+    const result = await update(editingId, formData);
+    if (result.success) setEditingId(null);
   };
 
-  const onDelete = async (id) => {
-    if (!confirm('¿Eliminar este cliente?')) return;
-    try {
-      await deleteCustomer(id);
-      loadCustomers();
-    } catch (err) {
-      setError('Error al eliminar el cliente');
-    }
+  const onDelete = (id) => {
+    if (confirm('¿Eliminar este cliente?')) remove(id);
   };
 
   const displayName = (c) => c.businessName || `${c.firstName} ${c.lastName || ''}`.trim();
 
-  if (loading) return <p>Cargando clientes...</p>;
+  if (loading) return <Spinner label="Cargando clientes..." />;
 
   return (
     <div className="customers-page">
       <h1>Clientes</h1>
-
-      {error && <p className="error">{error}</p>}
 
       <form onSubmit={handleSubmit(onCreate)} className="customer-form">
         <div className="person-type-toggle">
