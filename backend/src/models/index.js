@@ -6,6 +6,7 @@ import StockMovement from './stockMovement.model.js';
 import Payment from './payment.model.js';
 import User from './user.model.js';
 import Customer from './customer.model.js';
+import Supplier from './supplier.model.js';
 
 Business.hasMany(Category, { foreignKey: 'businessId' });
 Category.belongsTo(Business, { foreignKey: 'businessId' });
@@ -28,8 +29,11 @@ Payment.belongsTo(Business, { foreignKey: 'businessId' });
 Business.hasMany(User, { foreignKey: 'businessId' });
 User.belongsTo(Business, { foreignKey: 'businessId' });
 
-// Business → Customers
 Business.hasMany(Customer, { foreignKey: 'businessId' });
 Customer.belongsTo(Business, { foreignKey: 'businessId' });
 
-export { sequelize, Business, Category, Product, StockMovement, Payment, User, Customer };
+// Business → Suppliers
+Business.hasMany(Supplier, { foreignKey: 'businessId' });
+Supplier.belongsTo(Business, { foreignKey: 'businessId' });
+
+export { sequelize, Business, Category, Product, StockMovement, Payment, User, Customer, Supplier };
