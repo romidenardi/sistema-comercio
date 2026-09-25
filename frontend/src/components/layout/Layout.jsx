@@ -19,6 +19,7 @@ const Layout = () => {
           <NavLink to="/products">Productos</NavLink>
           <NavLink to="/categories">Categorías</NavLink>
           <NavLink to="/customers">Clientes</NavLink>
+          <NavLink to="/suppliers">Proveedores</NavLink>
           <NavLink to="/payments">Formas de pago</NavLink>
         </nav>
         <button className="sidebar-logout" onClick={handleLogout}>Cerrar sesión</button>
