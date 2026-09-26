@@ -20,6 +20,7 @@ const Layout = () => {
           <NavLink to="/categories">Categorías</NavLink>
           <NavLink to="/payments">Formas de pago</NavLink>
           <NavLink to="/customers">Clientes</NavLink>
+          <NavLink to="/orders">Remitos</NavLink>
           <NavLink to="/suppliers">Proveedores</NavLink>
           <NavLink to="/purchases">Compras</NavLink>          
         </nav>
