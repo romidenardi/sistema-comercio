@@ -540,3 +540,33 @@ td:nth-child(1),
     background: white;
   }
 }
+
+.print-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.import-hint {
+  color: var(--color-text-muted);
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+
+.import-result {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+
+.import-success {
+  color: var(--color-success);
+  font-weight: 500;
+}
+
+.import-error-title {
+  color: var(--color-danger);
+  font-weight: 500;
+  margin-top: 12px;
+}

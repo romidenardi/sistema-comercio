@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { getOrder } from '../../api/orders.api.js';
 import Spinner from '../../components/common/Spinner.jsx';
 
@@ -21,6 +21,9 @@ const OrderPrint = () => {
   return (
     <div className="print-page">
       <div className="print-actions no-print">
+        <Link to="/orders">
+          <button type="button">← Volver</button>
+        </Link>
         <button onClick={() => window.print()}>Imprimir</button>
       </div>
 

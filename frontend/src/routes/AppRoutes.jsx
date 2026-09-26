@@ -8,6 +8,7 @@ import Suppliers from '../pages/Suppliers/Suppliers.jsx';
 import Purchases from '../pages/Purchases/Purchases.jsx';
 import Orders from '../pages/Orders/Orders.jsx';
 import OrderPrint from '../pages/Orders/OrderPrint.jsx';
+import Imports from '../pages/Imports/Imports.jsx'; 
 import NotFound from '../pages/NotFound/NotFound.jsx';
 import PrivateRoute from './PrivateRoute.jsx';
 import Layout from '../components/layout/Layout.jsx';
@@ -29,6 +30,7 @@ const AppRoutes = () => {
           <Route path="/suppliers" element={<Suppliers />} />
           <Route path="/purchases" element={<Purchases />} />
           <Route path="/orders" element={<Orders />} />
+          <Route path="/imports" element={<Imports />} />
         </Route>
       </Route>
 

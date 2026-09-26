@@ -9,6 +9,7 @@ import customerRoutes from './routes/customer.routes.js';
 import supplierRoutes from './routes/supplier.routes.js';
 import purchaseRoutes from './routes/purchase.routes.js';
 import orderRoutes from './routes/order.routes.js';
+import importRoutes from './routes/import.routes.js';
 import { authMiddleware } from './middlewares/auth.middleware.js';
 import { errorMiddleware } from './middlewares/error.middleware.js';
 
@@ -27,6 +28,7 @@ app.use('/api/customers', authMiddleware, customerRoutes);
 app.use('/api/suppliers', authMiddleware, supplierRoutes);
 app.use('/api/purchases', authMiddleware, purchaseRoutes);
 app.use('/api/orders', authMiddleware, orderRoutes);
+app.use('/api/imports', authMiddleware, importRoutes);
 
 app.use(errorMiddleware);
 
