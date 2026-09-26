@@ -3,9 +3,9 @@ import { importProducts, importCustomers, importSuppliers } from '../../api/impo
 import { useToast } from '../../context/ToastContext.jsx';
 
 const IMPORT_TYPES = [
-  { key: 'products', label: 'Productos', fn: importProducts, columns: 'Codigo Interno, Nombre, Marca, Categoria, Precio, Costo, Unidad (unidad/peso)' },
-  { key: 'customers', label: 'Clientes', fn: importCustomers, columns: 'Razon Social o Nombre/Apellido, Condicion Fiscal, CUIT, Localidad, Provincia, Telefono, Email' },
-  { key: 'suppliers', label: 'Proveedores', fn: importSuppliers, columns: 'Nombre, CUIT, Contacto, Telefono, Email, Localidad, Provincia' },
+  { key: 'products', label: 'Productos', fn: importProducts, columns: 'Código Interno, Nombre, Marca, Categoría, Precio, Costo, Unidad (unidad/peso)' },
+  { key: 'customers', label: 'Clientes', fn: importCustomers, columns: 'Razón Social o Nombre/Apellido, Condición Fiscal, CUIT, Localidad, Provincia, Teléfono, Email' },
+  { key: 'suppliers', label: 'Proveedores', fn: importSuppliers, columns: 'Nombre, CUIT, Contacto, Teléfono, Email, Localidad, Provincia' },
 ];
 
 const Imports = () => {
