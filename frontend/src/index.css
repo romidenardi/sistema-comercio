@@ -456,3 +456,8 @@ td:nth-child(1),
 
 .purchase-item-row select { flex: 2; }
 .purchase-item-row input { flex: 1; }
+
+.purchase-item-row button {
+  width: 70px;
+  flex-shrink: 0;
+}
