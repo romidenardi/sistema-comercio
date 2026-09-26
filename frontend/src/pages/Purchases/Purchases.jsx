@@ -71,7 +71,6 @@ const Purchases = () => {
     }
   };
 
-  const productName = (id) => products.find((p) => p.id === id)?.name || '—';
   const supplierName = (id) => suppliers.find((s) => s.id === id)?.name || '—';
 
   if (loading) return <Spinner label="Cargando compras..." />;
@@ -116,9 +115,14 @@ const Purchases = () => {
                 placeholder="0.00"
                 {...register(`items.${index}.unitCost`, { required: true, min: 0 })}
               />
-              {fields.length > 1 && (
-                <button type="button" onClick={() => remove(index)}>Quitar</button>
-              )}
+              <button
+                type="button"
+                onClick={() => remove(index)}
+                disabled={fields.length === 1}
+                style={{ visibility: fields.length === 1 ? 'hidden' : 'visible' }}
+              >
+                Quitar
+              </button>
             </div>
           ))}
         </div>
