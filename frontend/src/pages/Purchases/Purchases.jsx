@@ -91,6 +91,12 @@ const Purchases = () => {
         <input placeholder="N° de factura (opcional)" {...register('invoiceNumber')} />
 
         <div className="purchase-items">
+          <div className="purchase-item-header">
+            <span>Producto</span>
+            <span>Cantidad</span>
+            <span>Costo unitario</span>
+            <span></span>
+          </div>
           {fields.map((field, index) => (
             <div key={field.id} className="purchase-item-row">
               <select {...register(`items.${index}.productId`, { required: true })}>
@@ -101,13 +107,13 @@ const Purchases = () => {
               </select>
               <input
                 type="number"
-                placeholder="Cantidad"
+                placeholder="0"
                 {...register(`items.${index}.quantity`, { required: true, min: 1 })}
               />
               <input
                 type="number"
                 step="0.01"
-                placeholder="Costo unitario"
+                placeholder="0.00"
                 {...register(`items.${index}.unitCost`, { required: true, min: 0 })}
               />
               {fields.length > 1 && (
