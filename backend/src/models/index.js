@@ -7,6 +7,8 @@ import Payment from './payment.model.js';
 import User from './user.model.js';
 import Customer from './customer.model.js';
 import Supplier from './supplier.model.js';
+import Purchase from './purchase.model.js';
+import PurchaseItem from './purchaseItem.model.js';
 
 Business.hasMany(Category, { foreignKey: 'businessId' });
 Category.belongsTo(Business, { foreignKey: 'businessId' });
@@ -32,8 +34,26 @@ User.belongsTo(Business, { foreignKey: 'businessId' });
 Business.hasMany(Customer, { foreignKey: 'businessId' });
 Customer.belongsTo(Business, { foreignKey: 'businessId' });
 
-// Business → Suppliers
 Business.hasMany(Supplier, { foreignKey: 'businessId' });
 Supplier.belongsTo(Business, { foreignKey: 'businessId' });
 
-export { sequelize, Business, Category, Product, StockMovement, Payment, User, Customer, Supplier };
+// Business → Purchases
+Business.hasMany(Purchase, { foreignKey: 'businessId' });
+Purchase.belongsTo(Business, { foreignKey: 'businessId' });
+
+// Supplier → Purchases
+Supplier.hasMany(Purchase, { foreignKey: 'supplierId' });
+Purchase.belongsTo(Supplier, { foreignKey: 'supplierId' });
+
+// Purchase → PurchaseItems
+Purchase.hasMany(PurchaseItem, { as: 'items', foreignKey: 'purchaseId' });
+PurchaseItem.belongsTo(Purchase, { foreignKey: 'purchaseId' });
+
+// Product → PurchaseItems
+Product.hasMany(PurchaseItem, { foreignKey: 'productId' });
+PurchaseItem.belongsTo(Product, { foreignKey: 'productId' });
+
+export {
+  sequelize, Business, Category, Product, StockMovement, Payment,
+  User, Customer, Supplier, Purchase, PurchaseItem,
+};
