@@ -29,9 +29,9 @@ const User = sequelize.define('User', {
     field: 'password_hash',
   },
   role: {
-    type: DataTypes.ENUM('owner', 'employee'),
+    type: DataTypes.ENUM('admin', 'editor', 'operador'),
     allowNull: false,
-    defaultValue: 'employee',
+    defaultValue: 'operador',
   },
   active: {
     type: DataTypes.BOOLEAN,
