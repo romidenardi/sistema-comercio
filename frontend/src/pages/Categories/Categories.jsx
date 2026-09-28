@@ -87,8 +87,8 @@ const Categories = () => {
             {topLevelCategories.map((category) => (
               <Fragment key={category.id}>
                 <tr>
-                  <td>
-                    {editingId === category.id ? (
+                  {editingId === category.id ? (
+                    <td className="edit-cell">
                       <form onSubmit={editForm.handleSubmit(onUpdate)} className="inline-edit-form">
                         <div className="field">
                           <label htmlFor={`edit-name-${category.id}`}>Nombre</label>
@@ -108,11 +108,11 @@ const Categories = () => {
                           <button type="button" onClick={() => setEditingId(null)}>Cancelar</button>
                         </div>
                       </form>
-                    ) : (
-                      category.name
-                    )}
-                  </td>
-                  <td>
+                    </td>
+                  ) : (
+                    <td data-label="Nombre">{category.name}</td>
+                  )}
+                  <td data-label="Acciones">
                     {editingId !== category.id && (
                       <>
                         <button onClick={() => startEdit(category)}>Editar</button>
@@ -123,8 +123,8 @@ const Categories = () => {
                 </tr>
                 {category.subcategories?.map((sub) => (
                   <tr key={sub.id} className="subcategory-row">
-                    <td>
-                      {editingId === sub.id ? (
+                    {editingId === sub.id ? (
+                      <td className="edit-cell">
                         <form onSubmit={editForm.handleSubmit(onUpdate)} className="inline-edit-form">
                           <div className="field">
                             <label htmlFor={`edit-name-${sub.id}`}>Nombre</label>
@@ -144,11 +144,13 @@ const Categories = () => {
                             <button type="button" onClick={() => setEditingId(null)}>Cancelar</button>
                           </div>
                         </form>
-                      ) : (
+                      </td>
+                    ) : (
+                      <td data-label="Nombre">
                         <span className="subcategory-name">↳ {sub.name}</span>
-                      )}
-                    </td>
-                    <td>
+                      </td>
+                    )}
+                    <td data-label="Acciones">
                       {editingId !== sub.id && (
                         <>
                           <button onClick={() => startEdit(sub)}>Editar</button>

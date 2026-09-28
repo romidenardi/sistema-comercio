@@ -52,19 +52,35 @@ const StockMovementPanel = ({ product, onStockChange }) => {
       <h3>Stock actual: {product.stock}</h3>
 
       <form onSubmit={handleSubmit(onSubmit)} className="stock-form">
-        <select {...register('type')}>
-          <option value="in">Ingreso</option>
-          <option value="out">Egreso</option>
-          <option value="adjustment">Ajuste (conteo físico)</option>
-        </select>
+        <div className="field">
+          <label htmlFor={`stock-type-${product.id}`}>Tipo de movimiento</label>
+          <select id={`stock-type-${product.id}`} {...register('type')}>
+            <option value="in">Ingreso</option>
+            <option value="out">Egreso</option>
+            <option value="adjustment">Ajuste (conteo físico)</option>
+          </select>
+        </div>
 
-        <input
-          type="number"
-          placeholder={type === 'adjustment' ? 'Stock real contado' : 'Cantidad'}
-          {...register('value', { required: true, min: 0 })}
-        />
+        <div className="field">
+          <label htmlFor={`stock-value-${product.id}`}>
+            {type === 'adjustment' ? 'Stock real contado' : 'Cantidad'}
+          </label>
+          <input
+            id={`stock-value-${product.id}`}
+            type="number"
+            placeholder={type === 'adjustment' ? 'Ej: 24' : 'Ej: 10'}
+            {...register('value', { required: true, min: 0 })}
+          />
+        </div>
 
-        <input placeholder="Motivo" {...register('reason')} />
+        <div className="field">
+          <label htmlFor={`stock-reason-${product.id}`}>Motivo (opcional)</label>
+          <input
+            id={`stock-reason-${product.id}`}
+            placeholder="Ej: Compra a proveedor"
+            {...register('reason')}
+          />
+        </div>
 
         <button type="submit">Registrar</button>
       </form>
@@ -72,26 +88,28 @@ const StockMovementPanel = ({ product, onStockChange }) => {
       {loading ? (
         <Spinner label="Cargando historial..." />
       ) : (
-        <table>
-          <thead>
-            <tr>
-              <th>Fecha</th>
-              <th>Tipo</th>
-              <th>Cambio</th>
-              <th>Motivo</th>
-            </tr>
-          </thead>
-          <tbody>
-            {movements.map((m) => (
-              <tr key={m.id}>
-                <td>{new Date(m.date).toLocaleString('es-AR')}</td>
-                <td>{m.type}</td>
-                <td>{m.quantity > 0 ? `+${m.quantity}` : m.quantity}</td>
-                <td>{m.reason || '—'}</td>
+        <div className="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Tipo</th>
+                <th>Cambio</th>
+                <th>Motivo</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {movements.map((m) => (
+                <tr key={m.id}>
+                  <td data-label="Fecha">{new Date(m.date).toLocaleString('es-AR')}</td>
+                  <td data-label="Tipo">{m.type}</td>
+                  <td data-label="Cambio">{m.quantity > 0 ? `+${m.quantity}` : m.quantity}</td>
+                  <td data-label="Motivo">{m.reason || '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );

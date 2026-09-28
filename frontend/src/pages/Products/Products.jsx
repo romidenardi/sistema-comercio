@@ -185,7 +185,7 @@ const Products = () => {
               <Fragment key={product.id}>
                 <tr>
                   {editingId === product.id ? (
-                    <td colSpan={8}>
+                    <td colSpan={8} className="edit-cell">
                       <form onSubmit={editForm.handleSubmit(onUpdate)} className="inline-edit-form">
                         <div className="field">
                           <label htmlFor={`edit-internalCode-${product.id}`}>Código interno</label>
@@ -258,14 +258,14 @@ const Products = () => {
                     </td>
                   ) : (
                     <>
-                      <td>{product.internalCode}</td>
-                      <td>{product.name}</td>
-                      <td>{categoryName(product.categoryId)}</td>
-                      <td>${Number(product.price).toFixed(2)}</td>
-                      <td>{product.promoPrice ? `$${Number(product.promoPrice).toFixed(2)}` : '—'}</td>
-                      <td>${Number(product.cost).toFixed(2)}</td>
-                      <td>{product.stock}</td>
-                      <td>
+                      <td data-label="Código">{product.internalCode}</td>
+                      <td data-label="Nombre">{product.name}</td>
+                      <td data-label="Categoría">{categoryName(product.categoryId)}</td>
+                      <td data-label="Precio">${Number(product.price).toFixed(2)}</td>
+                      <td data-label="Precio promo">{product.promoPrice ? `$${Number(product.promoPrice).toFixed(2)}` : '—'}</td>
+                      <td data-label="Costo">${Number(product.cost).toFixed(2)}</td>
+                      <td data-label="Stock">{product.stock}</td>
+                      <td data-label="Acciones">
                         <button onClick={() => startEdit(product)}>Editar</button>
                         <button onClick={() => onDelete(product.id)}>Eliminar</button>
                         <button onClick={() => setStockPanelId(stockPanelId === product.id ? null : product.id)}>
@@ -277,7 +277,7 @@ const Products = () => {
                 </tr>
                 {stockPanelId === product.id && (
                   <tr>
-                    <td colSpan={8}>
+                    <td colSpan={8} className="edit-cell">
                       <StockMovementPanel product={product} onStockChange={reload} />
                     </td>
                   </tr>

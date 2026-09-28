@@ -226,7 +226,6 @@ td button,
 th button {
   padding: 6px 10px;
   font-size: 13px;
-  margin-right: 6px;
   background: transparent;
   color: var(--color-accent);
   border: 1px solid var(--color-border);
@@ -237,8 +236,11 @@ td button:hover {
   border-color: var(--color-accent);
 }
 
-td button:last-child {
-  margin-right: 0;
+tbody td:last-child {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
 }
 
 /* ---------- Tablas ---------- */
@@ -371,6 +373,7 @@ td:nth-child(1),
   flex-direction: column;
   width: 320px;
   gap: 14px;
+  align-items: stretch;
 }
 
 .login-page h1 {
@@ -671,14 +674,91 @@ td:nth-child(1),
     min-width: 0;
     width: 100%;
   }
-  table, thead, tbody, th, td, tr {
-    font-size: 13px;
-  }
   .login-page form {
     width: 100%;
     max-width: 320px;
   }
   .print-page {
     padding: 16px;
+  }
+}
+
+/* ---------- Tablas como tarjetas en mobile ---------- */
+
+@media (max-width: 640px) {
+  .table-wrapper {
+    overflow-x: visible;
+  }
+
+  .table-wrapper table,
+  .table-wrapper thead,
+  .table-wrapper tbody,
+  .table-wrapper th,
+  .table-wrapper tr {
+    display: block;
+    width: 100%;
+  }
+
+  .table-wrapper thead {
+    display: none;
+  }
+
+  .table-wrapper tbody tr {
+    margin-bottom: 14px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+
+  .table-wrapper tbody tr:last-child {
+    margin-bottom: 0;
+  }
+
+  .table-wrapper tbody td {
+    display: block;
+    padding: 10px 14px 10px calc(42% + 14px);
+    border-bottom: 1px solid var(--color-border);
+    font-size: 13px;
+    position: relative;
+    min-height: 20px;
+  }
+
+  .table-wrapper tbody tr td:last-child {
+    border-bottom: none;
+  }
+
+  .table-wrapper tbody td::before {
+    content: attr(data-label);
+    position: absolute;
+    left: 14px;
+    top: 10px;
+    width: 38%;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--color-text-muted);
+    white-space: normal;
+  }
+
+  .table-wrapper tbody td:last-child {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+    padding: 10px 14px 10px calc(42% + 14px);
+  }
+
+  /* Celdas que contienen un formulario de edición completo: sin etiqueta, sin sangría */
+  .table-wrapper tbody td.edit-cell,
+  .table-wrapper tbody td.edit-cell:last-child {
+    display: block;
+    padding: 14px;
+  }
+
+  .table-wrapper tbody td.edit-cell::before {
+    content: none;
+  }
+
+  .subcategory-row td:first-child {
+    padding-left: calc(42% + 24px);
   }
 }

@@ -183,7 +183,7 @@ const Customers = () => {
             {customers.map((customer) => (
               <tr key={customer.id}>
                 {editingId === customer.id ? (
-                  <td colSpan={5}>
+                  <td colSpan={5} className="edit-cell">
                     <form onSubmit={editForm.handleSubmit(onUpdate)} className="inline-edit-form">
                       <div className="field">
                         <label htmlFor={`edit-businessName-${customer.id}`}>Razón social</label>
@@ -241,11 +241,11 @@ const Customers = () => {
                   </td>
                 ) : (
                   <>
-                    <td>{displayName(customer)}</td>
-                    <td>{customer.fiscalCondition}</td>
-                    <td>{customer.cuit || '—'}</td>
-                    <td>{customer.city || '—'}</td>
-                    <td>
+                    <td data-label="Nombre / Razón social">{displayName(customer)}</td>
+                    <td data-label="Condición fiscal">{customer.fiscalCondition}</td>
+                    <td data-label="CUIT">{customer.cuit || '—'}</td>
+                    <td data-label="Localidad">{customer.city || '—'}</td>
+                    <td data-label="Acciones">
                       <button onClick={() => startEdit(customer)}>Editar</button>
                       <button onClick={() => onDelete(customer.id)}>Eliminar</button>
                     </td>
