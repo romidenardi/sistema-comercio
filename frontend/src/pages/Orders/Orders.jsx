@@ -116,8 +116,7 @@ const Orders = () => {
   };
 
   const customerLabel = (c) => c.businessName || `${c.firstName} ${c.lastName || ''}`.trim();
-  const displayCustomer = (order) =>
-    order.Customer ? customerLabel(order.Customer) : '—';
+  const displayCustomer = (order) => (order.Customer ? customerLabel(order.Customer) : '—');
 
   if (loading) return <Spinner label="Cargando remitos..." />;
 
@@ -126,74 +125,104 @@ const Orders = () => {
       <h1>Remitos / Pedidos</h1>
 
       <form onSubmit={handleSubmit(onSubmit)} className="order-form">
-        <select {...register('customerId', { required: true })}>
-          <option value="">Elegí un cliente...</option>
-          {customers.map((c) => (
-            <option key={c.id} value={c.id}>{customerLabel(c)}</option>
-          ))}
-          <option value={NEW_CUSTOMER}>+ Nuevo cliente...</option>
-        </select>
+        <div className="field">
+          <label htmlFor="customerId">Cliente</label>
+          <select id="customerId" {...register('customerId', { required: true })}>
+            <option value="">Elegí un cliente...</option>
+            {customers.map((c) => (
+              <option key={c.id} value={c.id}>{customerLabel(c)}</option>
+            ))}
+            <option value={NEW_CUSTOMER}>+ Nuevo cliente...</option>
+          </select>
+        </div>
 
         {isNewCustomer && (
           <div className="inline-customer-form">
-            <input placeholder="Razón social (si es empresa)" {...register('newCustomer.businessName')} />
-            <input placeholder="Nombre" {...register('newCustomer.firstName')} />
-            <input placeholder="Apellido" {...register('newCustomer.lastName')} />
-            <select {...register('newCustomer.fiscalCondition')}>
-              <option value="">Condición fiscal...</option>
-              {FISCAL_CONDITIONS.map((fc) => (
-                <option key={fc} value={fc}>{fc}</option>
-              ))}
-            </select>
+            <div className="field">
+              <label htmlFor="newCustomerBusinessName">Razón social (si es empresa)</label>
+              <input id="newCustomerBusinessName" placeholder="Ej: Distribuidora del Sur SA" {...register('newCustomer.businessName')} />
+            </div>
+            <div className="field">
+              <label htmlFor="newCustomerFirstName">Nombre</label>
+              <input id="newCustomerFirstName" placeholder="Ej: Juan" {...register('newCustomer.firstName')} />
+            </div>
+            <div className="field">
+              <label htmlFor="newCustomerLastName">Apellido</label>
+              <input id="newCustomerLastName" placeholder="Ej: Pérez" {...register('newCustomer.lastName')} />
+            </div>
+            <div className="field">
+              <label htmlFor="newCustomerFiscalCondition">Condición fiscal</label>
+              <select id="newCustomerFiscalCondition" {...register('newCustomer.fiscalCondition')}>
+                <option value="">Condición fiscal...</option>
+                {FISCAL_CONDITIONS.map((fc) => (
+                  <option key={fc} value={fc}>{fc}</option>
+                ))}
+              </select>
+            </div>
           </div>
         )}
 
-        <select {...register('paymentId', { required: true })}>
-          <option value="">Forma de pago...</option>
-          {payments.filter((p) => p.active).map((p) => (
-            <option key={p.id} value={p.id}>{p.name}</option>
-          ))}
-        </select>
+        <div className="field">
+          <label htmlFor="paymentId">Forma de pago</label>
+          <select id="paymentId" {...register('paymentId', { required: true })}>
+            <option value="">Forma de pago...</option>
+            {payments.filter((p) => p.active).map((p) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+        </div>
 
-        <input placeholder="Notas (opcional)" {...register('notes')} />
+        <div className="field">
+          <label htmlFor="notes">Notas (opcional)</label>
+          <input id="notes" placeholder="Ej: Entregar antes del viernes" {...register('notes')} />
+        </div>
 
         <div className="purchase-items">
-          <div className="purchase-item-header">
-            <span>Producto</span>
-            <span>Cantidad</span>
-            <span>Precio unitario</span>
-            <span></span>
-          </div>
           {fields.map((field, index) => (
             <div key={field.id} className="purchase-item-row">
-              <select
-                {...register(`items.${index}.productId`, { required: true })}
-                onChange={(e) => onProductChange(index, e.target.value)}
-              >
-                <option value="">Producto...</option>
-                {products.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name} (stock: {p.stock})</option>
-                ))}
-              </select>
-              <input
-                type="number"
-                placeholder="0"
-                {...register(`items.${index}.quantity`, { required: true, min: 1 })}
-              />
-              <input
-                type="number"
-                step="0.01"
-                placeholder="0.00"
-                {...register(`items.${index}.unitPrice`, { required: true, min: 0 })}
-              />
-              <button
-                type="button"
-                onClick={() => remove(index)}
-                disabled={fields.length === 1}
-                style={{ visibility: fields.length === 1 ? 'hidden' : 'visible' }}
-              >
-                Quitar
-              </button>
+              <div className="field">
+                <label htmlFor={`order-item-product-${index}`}>Producto</label>
+                <select
+                  id={`order-item-product-${index}`}
+                  {...register(`items.${index}.productId`, { required: true })}
+                  onChange={(e) => onProductChange(index, e.target.value)}
+                >
+                  <option value="">Producto...</option>
+                  {products.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name} (stock: {p.stock})</option>
+                  ))}
+                </select>
+              </div>
+              <div className="field">
+                <label htmlFor={`order-item-quantity-${index}`}>Cantidad</label>
+                <input
+                  id={`order-item-quantity-${index}`}
+                  type="number"
+                  placeholder="Ej: 2"
+                  {...register(`items.${index}.quantity`, { required: true, min: 1 })}
+                />
+              </div>
+              <div className="field">
+                <label htmlFor={`order-item-price-${index}`}>Precio unitario</label>
+                <input
+                  id={`order-item-price-${index}`}
+                  type="number"
+                  step="0.01"
+                  placeholder="Ej: 1500"
+                  {...register(`items.${index}.unitPrice`, { required: true, min: 0 })}
+                />
+              </div>
+              <div className="field item-remove-field">
+                <label aria-hidden="true">&nbsp;</label>
+                <button
+                  type="button"
+                  onClick={() => remove(index)}
+                  disabled={fields.length === 1}
+                  style={{ visibility: fields.length === 1 ? 'hidden' : 'visible' }}
+                >
+                  Quitar
+                </button>
+              </div>
             </div>
           ))}
         </div>
@@ -207,32 +236,34 @@ const Orders = () => {
         <button type="submit">Generar remito</button>
       </form>
 
-      <table>
-        <thead>
-          <tr>
-            <th>Fecha</th>
-            <th>Cliente</th>
-            <th>Forma de pago</th>
-            <th>Total</th>
-            <th>Acciones</th>
-          </tr>
-        </thead>
-        <tbody>
-          {orders.map((order) => (
-            <tr key={order.id}>
-              <td>{new Date(order.date).toLocaleDateString('es-AR')}</td>
-              <td>{displayCustomer(order)}</td>
-              <td>{order.Payment?.name || '—'}</td>
-              <td>${Number(order.total).toFixed(2)}</td>
-              <td>
-                <Link to={`/orders/${order.id}/print`}>
-                  <button type="button">Ver / Imprimir</button>
-                </Link>
-              </td>
+      <div className="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Cliente</th>
+              <th>Forma de pago</th>
+              <th>Total</th>
+              <th>Acciones</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {orders.map((order) => (
+              <tr key={order.id}>
+                <td>{new Date(order.date).toLocaleDateString('es-AR')}</td>
+                <td>{displayCustomer(order)}</td>
+                <td>{order.Payment?.name || '—'}</td>
+                <td>${Number(order.total).toFixed(2)}</td>
+                <td>
+                  <Link to={`/orders/${order.id}/print`}>
+                    <button type="button">Ver / Imprimir</button>
+                  </Link>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 };

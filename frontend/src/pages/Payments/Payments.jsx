@@ -1,8 +1,8 @@
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useResource } from '../../hooks/useResource.js';
 import * as paymentsApi from '../../api/payments.api.js';
 import Spinner from '../../components/common/Spinner.jsx';
-import { useState } from 'react';
 
 const api = {
   getAll: paymentsApi.getPayments,
@@ -19,24 +19,28 @@ const Payments = () => {
   const editForm = useForm();
 
   const onCreate = async (formData) => {
-    const result = await create({ name: formData.name });
+    const result = await create({
+      name: formData.name,
+      active: true,
+    });
     if (result.success) reset();
   };
 
   const startEdit = (payment) => {
     setEditingId(payment.id);
-    editForm.reset({ name: payment.name });
+    editForm.reset({ name: payment.name, active: String(payment.active) });
   };
 
-  const onUpdateName = async (formData) => {
-    const result = await update(editingId, { name: formData.name });
+  const onUpdate = async (formData) => {
+    const result = await update(editingId, {
+      name: formData.name,
+      active: formData.active === 'true',
+    });
     if (result.success) setEditingId(null);
   };
 
-  const toggleActive = (payment) => update(payment.id, { active: !payment.active });
-
   const onDelete = (id) => {
-    if (confirm('¿Eliminar esta forma de pago definitivamente?')) remove(id);
+    if (confirm('¿Eliminar esta forma de pago?')) remove(id);
   };
 
   if (loading) return <Spinner label="Cargando formas de pago..." />;
@@ -46,53 +50,70 @@ const Payments = () => {
       <h1>Formas de pago</h1>
 
       <form onSubmit={handleSubmit(onCreate)} className="payment-form">
-        <input
-          placeholder="Nombre (ej. Efectivo, Tarjeta)"
-          {...register('name', { required: 'El nombre es obligatorio' })}
-        />
-        {errors.name && <span className="error">{errors.name.message}</span>}
-        <button type="submit">Agregar</button>
+        <div className="field">
+          <label htmlFor="name">Nombre</label>
+          <input
+            id="name"
+            placeholder="Ej: Transferencia bancaria"
+            {...register('name', { required: 'El nombre es obligatorio' })}
+          />
+          {errors.name && <span className="error">{errors.name.message}</span>}
+        </div>
+
+        <button type="submit">Agregar forma de pago</button>
       </form>
 
-      <table>
-        <thead>
-          <tr>
-            <th>Nombre</th>
-            <th>Estado</th>
-            <th>Acciones</th>
-          </tr>
-        </thead>
-        <tbody>
-          {payments.map((payment) => (
-            <tr key={payment.id}>
-              <td>
+      <div className="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Nombre</th>
+              <th>Estado</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {payments.map((payment) => (
+              <tr key={payment.id}>
                 {editingId === payment.id ? (
-                  <form onSubmit={editForm.handleSubmit(onUpdateName)} style={{ display: 'inline' }}>
-                    <input {...editForm.register('name', { required: true })} />
-                    <button type="submit">Guardar</button>
-                    <button type="button" onClick={() => setEditingId(null)}>Cancelar</button>
-                  </form>
+                  <td colSpan={3}>
+                    <form onSubmit={editForm.handleSubmit(onUpdate)} className="inline-edit-form">
+                      <div className="field">
+                        <label htmlFor={`edit-name-${payment.id}`}>Nombre</label>
+                        <input
+                          id={`edit-name-${payment.id}`}
+                          placeholder="Ej: Transferencia bancaria"
+                          {...editForm.register('name', { required: true })}
+                        />
+                      </div>
+                      <div className="field">
+                        <label htmlFor={`edit-active-${payment.id}`}>Estado</label>
+                        <select id={`edit-active-${payment.id}`} {...editForm.register('active')}>
+                          <option value="true">Activa</option>
+                          <option value="false">Inactiva</option>
+                        </select>
+                      </div>
+                      <div className="inline-edit-actions">
+                        <button type="submit">Guardar</button>
+                        <button type="button" onClick={() => setEditingId(null)}>Cancelar</button>
+                      </div>
+                    </form>
+                  </td>
                 ) : (
-                  payment.name
-                )}
-              </td>
-              <td>
-                <button onClick={() => toggleActive(payment)}>
-                  {payment.active ? 'Activa' : 'Inactiva'}
-                </button>
-              </td>
-              <td>
-                {editingId !== payment.id && (
                   <>
-                    <button onClick={() => startEdit(payment)}>Editar</button>
-                    <button onClick={() => onDelete(payment.id)}>Eliminar</button>
+                    <td>{payment.name}</td>
+                    <td>{payment.active ? 'Activa' : 'Inactiva'}</td>
+                    <td>
+                      <button onClick={() => startEdit(payment)}>Editar</button>
+                      <button onClick={() => onDelete(payment.id)}>Eliminar</button>
+                    </td>
                   </>
                 )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 };

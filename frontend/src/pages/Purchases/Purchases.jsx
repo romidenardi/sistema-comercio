@@ -80,49 +80,63 @@ const Purchases = () => {
       <h1>Compras a proveedores</h1>
 
       <form onSubmit={handleSubmit(onSubmit)} className="purchase-form">
-        <select {...register('supplierId', { required: true })}>
-          <option value="">Elegí un proveedor...</option>
-          {suppliers.map((s) => (
-            <option key={s.id} value={s.id}>{s.name}</option>
-          ))}
-        </select>
+        <div className="field">
+          <label htmlFor="supplierId">Proveedor</label>
+          <select id="supplierId" {...register('supplierId', { required: true })}>
+            <option value="">Elegí un proveedor...</option>
+            {suppliers.map((s) => (
+              <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+          </select>
+        </div>
 
-        <input placeholder="N° de factura (opcional)" {...register('invoiceNumber')} />
+        <div className="field">
+          <label htmlFor="invoiceNumber">N° de factura (opcional)</label>
+          <input id="invoiceNumber" placeholder="Ej: 0001-00001234" {...register('invoiceNumber')} />
+        </div>
 
         <div className="purchase-items">
-          <div className="purchase-item-header">
-            <span>Producto</span>
-            <span>Cantidad</span>
-            <span>Costo unitario</span>
-            <span></span>
-          </div>
           {fields.map((field, index) => (
             <div key={field.id} className="purchase-item-row">
-              <select {...register(`items.${index}.productId`, { required: true })}>
-                <option value="">Producto...</option>
-                {products.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name} ({p.internalCode})</option>
-                ))}
-              </select>
-              <input
-                type="number"
-                placeholder="0"
-                {...register(`items.${index}.quantity`, { required: true, min: 1 })}
-              />
-              <input
-                type="number"
-                step="0.01"
-                placeholder="0.00"
-                {...register(`items.${index}.unitCost`, { required: true, min: 0 })}
-              />
-              <button
-                type="button"
-                onClick={() => remove(index)}
-                disabled={fields.length === 1}
-                style={{ visibility: fields.length === 1 ? 'hidden' : 'visible' }}
-              >
-                Quitar
-              </button>
+              <div className="field">
+                <label htmlFor={`item-product-${index}`}>Producto</label>
+                <select id={`item-product-${index}`} {...register(`items.${index}.productId`, { required: true })}>
+                  <option value="">Producto...</option>
+                  {products.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name} ({p.internalCode})</option>
+                  ))}
+                </select>
+              </div>
+              <div className="field">
+                <label htmlFor={`item-quantity-${index}`}>Cantidad</label>
+                <input
+                  id={`item-quantity-${index}`}
+                  type="number"
+                  placeholder="Ej: 10"
+                  {...register(`items.${index}.quantity`, { required: true, min: 1 })}
+                />
+              </div>
+              <div className="field">
+                <label htmlFor={`item-unitCost-${index}`}>Costo unitario</label>
+                <input
+                  id={`item-unitCost-${index}`}
+                  type="number"
+                  step="0.01"
+                  placeholder="Ej: 850"
+                  {...register(`items.${index}.unitCost`, { required: true, min: 0 })}
+                />
+              </div>
+              <div className="field item-remove-field">
+                <label aria-hidden="true">&nbsp;</label>
+                <button
+                  type="button"
+                  onClick={() => remove(index)}
+                  disabled={fields.length === 1}
+                  style={{ visibility: fields.length === 1 ? 'hidden' : 'visible' }}
+                >
+                  Quitar
+                </button>
+              </div>
             </div>
           ))}
         </div>
@@ -136,28 +150,30 @@ const Purchases = () => {
         <button type="submit">Registrar compra</button>
       </form>
 
-      <table>
-        <thead>
-          <tr>
-            <th>Fecha</th>
-            <th>Proveedor</th>
-            <th>Factura</th>
-            <th>Artículos</th>
-            <th>Total</th>
-          </tr>
-        </thead>
-        <tbody>
-          {purchases.map((purchase) => (
-            <tr key={purchase.id}>
-              <td>{new Date(purchase.date).toLocaleDateString('es-AR')}</td>
-              <td>{purchase.Supplier?.name || supplierName(purchase.supplierId)}</td>
-              <td>{purchase.invoiceNumber || '—'}</td>
-              <td>{purchase.items?.map((i) => `${i.Product?.name} x${i.quantity}`).join(', ')}</td>
-              <td>${Number(purchase.total).toFixed(2)}</td>
+      <div className="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Proveedor</th>
+              <th>Factura</th>
+              <th>Artículos</th>
+              <th>Total</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {purchases.map((purchase) => (
+              <tr key={purchase.id}>
+                <td>{new Date(purchase.date).toLocaleDateString('es-AR')}</td>
+                <td>{purchase.Supplier?.name || supplierName(purchase.supplierId)}</td>
+                <td>{purchase.invoiceNumber || '—'}</td>
+                <td>{purchase.items?.map((i) => `${i.Product?.name} x${i.quantity}`).join(', ')}</td>
+                <td>${Number(purchase.total).toFixed(2)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 };
