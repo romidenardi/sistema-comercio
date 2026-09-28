@@ -7,6 +7,7 @@ import {
   deleteSupplier,
 } from '../controllers/supplier.controller.js';
 import { validate } from '../middlewares/validate.middleware.js';
+import { requireRole } from '../middlewares/role.middleware.js';
 
 const router = Router();
 
@@ -15,8 +16,8 @@ const createRules = [
 ];
 
 router.get('/', getSuppliers);
-router.post('/', createRules, validate, createSupplier);
-router.put('/:id', updateSupplier);
-router.delete('/:id', deleteSupplier);
+router.post('/', requireRole('admin', 'editor'), createRules, validate, createSupplier);
+router.put('/:id', requireRole('admin', 'editor'), updateSupplier);
+router.delete('/:id', requireRole('admin', 'editor'), deleteSupplier);
 
 export default router;
