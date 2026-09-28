@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { body } from 'express-validator';
 import { getOrders, getOrder, createOrder } from '../controllers/order.controller.js';
 import { validate } from '../middlewares/validate.middleware.js';
+import { requireRole } from '../middlewares/role.middleware.js';
 
 const router = Router();
 
@@ -13,6 +14,6 @@ const createRules = [
 
 router.get('/', getOrders);
 router.get('/:id', getOrder);
-router.post('/', createRules, validate, createOrder);
+router.post('/', requireRole('admin', 'editor', 'operador'), createRules, validate, createOrder);
 
 export default router;

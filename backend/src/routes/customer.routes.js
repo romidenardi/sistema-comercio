@@ -7,6 +7,7 @@ import {
   deleteCustomer,
 } from '../controllers/customer.controller.js';
 import { validate } from '../middlewares/validate.middleware.js';
+import { requireRole } from '../middlewares/role.middleware.js';
 
 const router = Router();
 
@@ -21,8 +22,8 @@ const createRules = [
 ];
 
 router.get('/', getCustomers);
-router.post('/', createRules, validate, createCustomer);
-router.put('/:id', updateCustomer);
-router.delete('/:id', deleteCustomer);
+router.post('/', requireRole('admin', 'editor'), createRules, validate, createCustomer);
+router.put('/:id', requireRole('admin', 'editor'), updateCustomer);
+router.delete('/:id', requireRole('admin', 'editor'), deleteCustomer);
 
 export default router;

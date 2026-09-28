@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { useResource } from '../../hooks/useResource.js';
-import * as customersApi from '../../api/customers.api.js';
-import Spinner from '../../components/common/Spinner.jsx';
+import { useResource } from '../hooks/useResource.js';
+import * as customersApi from '../api/customers.api.js';
+import Spinner from '../components/common/Spinner.jsx';
 
 const api = {
   getAll: customersApi.getCustomers,

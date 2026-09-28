@@ -7,6 +7,7 @@ import {
   deleteCategory,
 } from '../controllers/category.controller.js';
 import { validate } from '../middlewares/validate.middleware.js';
+import { requireRole } from '../middlewares/role.middleware.js';
 
 const router = Router();
 
@@ -19,8 +20,8 @@ const updateRules = [
 ];
 
 router.get('/', getCategories);
-router.post('/', createRules, validate, createCategory);
-router.put('/:id', updateRules, validate, updateCategory);
-router.delete('/:id', deleteCategory);
+router.post('/', requireRole('admin', 'editor'), createRules, validate, createCategory);
+router.put('/:id', requireRole('admin', 'editor'), updateRules, validate, updateCategory);
+router.delete('/:id', requireRole('admin', 'editor'), deleteCategory);
 
 export default router;
