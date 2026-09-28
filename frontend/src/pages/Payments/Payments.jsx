@@ -76,7 +76,7 @@ const Payments = () => {
             {payments.map((payment) => (
               <tr key={payment.id}>
                 {editingId === payment.id ? (
-                  <td colSpan={3}>
+                  <td colSpan={3} className="edit-cell">
                     <form onSubmit={editForm.handleSubmit(onUpdate)} className="inline-edit-form">
                       <div className="field">
                         <label htmlFor={`edit-name-${payment.id}`}>Nombre</label>
@@ -101,9 +101,9 @@ const Payments = () => {
                   </td>
                 ) : (
                   <>
-                    <td>{payment.name}</td>
-                    <td>{payment.active ? 'Activa' : 'Inactiva'}</td>
-                    <td>
+                    <td data-label="Nombre">{payment.name}</td>
+                    <td data-label="Estado">{payment.active ? 'Activa' : 'Inactiva'}</td>
+                    <td data-label="Acciones">
                       <button onClick={() => startEdit(payment)}>Editar</button>
                       <button onClick={() => onDelete(payment.id)}>Eliminar</button>
                     </td>

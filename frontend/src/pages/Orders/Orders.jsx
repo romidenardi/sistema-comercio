@@ -250,11 +250,11 @@ const Orders = () => {
           <tbody>
             {orders.map((order) => (
               <tr key={order.id}>
-                <td>{new Date(order.date).toLocaleDateString('es-AR')}</td>
-                <td>{displayCustomer(order)}</td>
-                <td>{order.Payment?.name || '—'}</td>
-                <td>${Number(order.total).toFixed(2)}</td>
-                <td>
+                <td data-label="Fecha">{new Date(order.date).toLocaleDateString('es-AR')}</td>
+                <td data-label="Cliente">{displayCustomer(order)}</td>
+                <td data-label="Forma de pago">{order.Payment?.name || '—'}</td>
+                <td data-label="Total">${Number(order.total).toFixed(2)}</td>
+                <td data-label="Acciones">
                   <Link to={`/orders/${order.id}/print`}>
                     <button type="button">Ver / Imprimir</button>
                   </Link>

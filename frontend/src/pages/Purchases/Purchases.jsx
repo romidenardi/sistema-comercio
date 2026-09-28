@@ -164,11 +164,11 @@ const Purchases = () => {
           <tbody>
             {purchases.map((purchase) => (
               <tr key={purchase.id}>
-                <td>{new Date(purchase.date).toLocaleDateString('es-AR')}</td>
-                <td>{purchase.Supplier?.name || supplierName(purchase.supplierId)}</td>
-                <td>{purchase.invoiceNumber || '—'}</td>
-                <td>{purchase.items?.map((i) => `${i.Product?.name} x${i.quantity}`).join(', ')}</td>
-                <td>${Number(purchase.total).toFixed(2)}</td>
+                <td data-label="Fecha">{new Date(purchase.date).toLocaleDateString('es-AR')}</td>
+                <td data-label="Proveedor">{purchase.Supplier?.name || supplierName(purchase.supplierId)}</td>
+                <td data-label="Factura">{purchase.invoiceNumber || '—'}</td>
+                <td data-label="Artículos">{purchase.items?.map((i) => `${i.Product?.name} x${i.quantity}`).join(', ')}</td>
+                <td data-label="Total">${Number(purchase.total).toFixed(2)}</td>
               </tr>
             ))}
           </tbody>
