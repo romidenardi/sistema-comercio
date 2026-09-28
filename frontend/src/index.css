@@ -418,18 +418,25 @@ td:nth-child(1),
   color: var(--color-primary);
 }
 
-.purchase-item-row {
-  display: flex;
-  gap: 8px;
-  width: 100%;
-  align-items: center;
-}
-
 .purchase-items {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
   width: 100%;
+}
+
+.purchase-item-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  width: 100%;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.purchase-item-row .field {
+  flex: 1 1 160px;
 }
 
 .purchase-total {
@@ -438,28 +445,6 @@ td:nth-child(1),
   font-weight: 500;
   text-align: right;
   padding: 8px 0;
-}
-
-.purchase-item-header {
-  display: flex;
-  gap: 8px;
-  width: 100%;
-  font-size: 12px;
-  color: var(--color-text-muted);
-  padding: 0 2px;
-}
-
-.purchase-item-header span:nth-child(1) { flex: 2; }
-.purchase-item-header span:nth-child(2) { flex: 1; }
-.purchase-item-header span:nth-child(3) { flex: 1; }
-.purchase-item-header span:nth-child(4) { width: 70px; }
-
-.purchase-item-row select { flex: 2; }
-.purchase-item-row input { flex: 1; }
-
-.purchase-item-row button {
-  width: 70px;
-  flex-shrink: 0;
 }
 
 .inline-customer-form {
@@ -569,4 +554,124 @@ td:nth-child(1),
   color: var(--color-danger);
   font-weight: 500;
   margin-top: 12px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.field label {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+.field-full {
+  flex: 1 1 100%;
+  width: 100%;
+}
+
+.inline-edit-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: flex-end;
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+
+.inline-edit-actions {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.subcategory-row td:first-child {
+  padding-left: 32px;
+}
+
+.subcategory-name {
+  color: var(--color-text-muted);
+}
+
+.item-remove-field {
+  flex: 0 0 auto;
+}
+
+.item-remove-field button {
+  width: 70px;
+}
+
+@media (max-width: 860px) {
+  .app-layout {
+    flex-direction: column;
+  }
+  .sidebar {
+    width: 100%;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    padding: 12px 16px;
+    gap: 8px;
+  }
+  .sidebar-brand {
+    width: 100%;
+    padding: 0 0 8px;
+    border-bottom: none;
+    margin-bottom: 0;
+  }
+  .sidebar-nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 4px;
+    flex: 1;
+  }
+  .sidebar-nav a {
+    padding: 8px 12px;
+    border-left: none;
+    border-radius: var(--radius);
+  }
+  .sidebar-nav a.active {
+    border-left: none;
+  }
+  .sidebar-logout {
+    margin: 0;
+  }
+  .app-main {
+    padding: 20px 16px;
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 600px) {
+  form {
+    padding: 14px;
+    gap: 10px;
+  }
+  .field {
+    width: 100%;
+  }
+  input, select, textarea {
+    min-width: 0;
+    width: 100%;
+  }
+  table, thead, tbody, th, td, tr {
+    font-size: 13px;
+  }
+  .login-page form {
+    width: 100%;
+    max-width: 320px;
+  }
+  .print-page {
+    padding: 16px;
+  }
 }

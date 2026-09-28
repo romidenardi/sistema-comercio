@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, Fragment } from 'react';
 import { useForm } from 'react-hook-form';
 import { useResource } from '../../hooks/useResource.js';
 import * as categoriesApi from '../../api/categories.api.js';
@@ -30,11 +30,14 @@ const Categories = () => {
 
   const startEdit = (category) => {
     setEditingId(category.id);
-    editForm.reset({ name: category.name });
+    editForm.reset({ name: category.name, parentId: category.parentId || '' });
   };
 
   const onUpdate = async (formData) => {
-    const result = await update(editingId, { name: formData.name });
+    const result = await update(editingId, {
+      name: formData.name,
+      parentId: formData.parentId || null,
+    });
     if (result.success) setEditingId(null);
   };
 
@@ -49,61 +52,117 @@ const Categories = () => {
       <h1>Categorías</h1>
 
       <form onSubmit={handleSubmit(onCreate)} className="category-form">
-        <input
-          placeholder="Nombre de la categoría"
-          {...register('name', { required: 'El nombre es obligatorio' })}
-        />
-        {errors.name && <span className="error">{errors.name.message}</span>}
+        <div className="field">
+          <label htmlFor="name">Nombre</label>
+          <input
+            id="name"
+            placeholder="Ej: Bebidas"
+            {...register('name', { required: 'El nombre es obligatorio' })}
+          />
+          {errors.name && <span className="error">{errors.name.message}</span>}
+        </div>
 
-        <select {...register('parentId')}>
-          <option value="">Sin categoría padre</option>
-          {topLevelCategories.map((c) => (
-            <option key={c.id} value={c.id}>{c.name}</option>
-          ))}
-        </select>
+        <div className="field">
+          <label htmlFor="parentId">Categoría padre (opcional)</label>
+          <select id="parentId" {...register('parentId')}>
+            <option value="">Sin categoría padre</option>
+            {topLevelCategories.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+        </div>
 
         <button type="submit">Agregar categoría</button>
       </form>
 
-      <table>
-        <thead>
-          <tr>
-            <th>Nombre</th>
-            <th>Subcategorías</th>
-            <th>Acciones</th>
-          </tr>
-        </thead>
-        <tbody>
-          {categories.map((category) => (
-            <tr key={category.id}>
-              <td>
-                {editingId === category.id ? (
-                  <form onSubmit={editForm.handleSubmit(onUpdate)} style={{ display: 'inline' }}>
-                    <input {...editForm.register('name', { required: true })} />
-                    <button type="submit">Guardar</button>
-                    <button type="button" onClick={() => setEditingId(null)}>Cancelar</button>
-                  </form>
-                ) : (
-                  category.name
-                )}
-              </td>
-              <td>
-                {category.subcategories?.length
-                  ? category.subcategories.map((s) => s.name).join(', ')
-                  : '—'}
-              </td>
-              <td>
-                {editingId !== category.id && (
-                  <>
-                    <button onClick={() => startEdit(category)}>Editar</button>
-                    <button onClick={() => onDelete(category.id)}>Eliminar</button>
-                  </>
-                )}
-              </td>
+      <div className="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Nombre</th>
+              <th>Acciones</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {topLevelCategories.map((category) => (
+              <Fragment key={category.id}>
+                <tr>
+                  <td>
+                    {editingId === category.id ? (
+                      <form onSubmit={editForm.handleSubmit(onUpdate)} className="inline-edit-form">
+                        <div className="field">
+                          <label htmlFor={`edit-name-${category.id}`}>Nombre</label>
+                          <input id={`edit-name-${category.id}`} {...editForm.register('name', { required: true })} />
+                        </div>
+                        <div className="field">
+                          <label htmlFor={`edit-parent-${category.id}`}>Categoría padre</label>
+                          <select id={`edit-parent-${category.id}`} {...editForm.register('parentId')}>
+                            <option value="">Sin categoría padre</option>
+                            {topLevelCategories.filter((c) => c.id !== category.id).map((c) => (
+                              <option key={c.id} value={c.id}>{c.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="inline-edit-actions">
+                          <button type="submit">Guardar</button>
+                          <button type="button" onClick={() => setEditingId(null)}>Cancelar</button>
+                        </div>
+                      </form>
+                    ) : (
+                      category.name
+                    )}
+                  </td>
+                  <td>
+                    {editingId !== category.id && (
+                      <>
+                        <button onClick={() => startEdit(category)}>Editar</button>
+                        <button onClick={() => onDelete(category.id)}>Eliminar</button>
+                      </>
+                    )}
+                  </td>
+                </tr>
+                {category.subcategories?.map((sub) => (
+                  <tr key={sub.id} className="subcategory-row">
+                    <td>
+                      {editingId === sub.id ? (
+                        <form onSubmit={editForm.handleSubmit(onUpdate)} className="inline-edit-form">
+                          <div className="field">
+                            <label htmlFor={`edit-name-${sub.id}`}>Nombre</label>
+                            <input id={`edit-name-${sub.id}`} {...editForm.register('name', { required: true })} />
+                          </div>
+                          <div className="field">
+                            <label htmlFor={`edit-parent-${sub.id}`}>Categoría padre</label>
+                            <select id={`edit-parent-${sub.id}`} {...editForm.register('parentId')}>
+                              <option value="">Sin categoría padre</option>
+                              {topLevelCategories.map((c) => (
+                                <option key={c.id} value={c.id}>{c.name}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="inline-edit-actions">
+                            <button type="submit">Guardar</button>
+                            <button type="button" onClick={() => setEditingId(null)}>Cancelar</button>
+                          </div>
+                        </form>
+                      ) : (
+                        <span className="subcategory-name">↳ {sub.name}</span>
+                      )}
+                    </td>
+                    <td>
+                      {editingId !== sub.id && (
+                        <>
+                          <button onClick={() => startEdit(sub)}>Editar</button>
+                          <button onClick={() => onDelete(sub.id)}>Eliminar</button>
+                        </>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </Fragment>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 };
