@@ -8,7 +8,8 @@ import Suppliers from '../pages/Suppliers/Suppliers.jsx';
 import Purchases from '../pages/Purchases/Purchases.jsx';
 import Orders from '../pages/Orders/Orders.jsx';
 import OrderPrint from '../pages/Orders/OrderPrint.jsx';
-import Imports from '../pages/Imports/Imports.jsx'; 
+import Imports from '../pages/Imports/Imports.jsx';
+import Users from '../pages/Users/Users.jsx';
 import NotFound from '../pages/NotFound/NotFound.jsx';
 import PrivateRoute from './PrivateRoute.jsx';
 import Layout from '../components/layout/Layout.jsx';
@@ -23,14 +24,22 @@ const AppRoutes = () => {
 
         <Route element={<Layout />}>
           <Route path="/" element={<div>Bienvenida</div>} />
-          <Route path="/categories" element={<Categories />} />
-          <Route path="/payments" element={<Payments />} />
-          <Route path="/customers" element={<Customers />} />
-          <Route path="/products" element={<Products />} />
-          <Route path="/suppliers" element={<Suppliers />} />
-          <Route path="/purchases" element={<Purchases />} />
+
           <Route path="/orders" element={<Orders />} />
-          <Route path="/imports" element={<Imports />} />
+          <Route path="/purchases" element={<Purchases />} />
+
+          <Route element={<PrivateRoute allowedRoles={['admin', 'editor']} />}>
+            <Route path="/categories" element={<Categories />} />
+            <Route path="/payments" element={<Payments />} />
+            <Route path="/customers" element={<Customers />} />
+            <Route path="/products" element={<Products />} />
+            <Route path="/suppliers" element={<Suppliers />} />
+            <Route path="/imports" element={<Imports />} />
+          </Route>
+
+          <Route element={<PrivateRoute allowedRoles={['admin']} />}>
+            <Route path="/users" element={<Users />} />
+          </Route>
         </Route>
       </Route>
 

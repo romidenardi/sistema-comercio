@@ -4,7 +4,7 @@ import { User } from '../models/index.js';
 
 export const register = async (req, res) => {
   try {
-    const { name, email, password, role } = req.body;
+    const { name, email, password } = req.body;
 
     if (!name || !email || !password) {
       return res.status(400).json({ message: 'Nombre, email y contraseña son obligatorios' });
@@ -15,17 +15,27 @@ export const register = async (req, res) => {
       return res.status(400).json({ message: 'Ya existe un usuario con ese email' });
     }
 
+    const usersInBusiness = await User.count({
+      where: { businessId: process.env.BUSINESS_ID_DEFAULT },
+    });
+
+    if (usersInBusiness > 0) {
+      return res.status(403).json({
+        message: 'Ya existe un administrador para este comercio. Pedile que te cree el usuario desde la pantalla de Usuarios.',
+      });
+    }
+
     const passwordHash = await bcrypt.hash(password, 10);
 
+    // El primer usuario de un comercio siempre se crea como admin
     const user = await User.create({
       name,
       email,
       passwordHash,
-      role: role || 'employee',
+      role: 'admin',
       businessId: process.env.BUSINESS_ID_DEFAULT,
     });
 
-    // nunca devolver el hash en la respuesta
     const { passwordHash: _, ...userSafe } = user.toJSON();
     res.status(201).json(userSafe);
   } catch (error) {
@@ -57,7 +67,10 @@ export const login = async (req, res) => {
       { expiresIn: '8h' }
     );
 
-    res.json({ token });
+    res.json({
+      token,
+      user: { id: user.id, name: user.name, email: user.email, role: user.role },
+    });
   } catch (error) {
     res.status(500).json({ message: 'Error logging in', error: error.message });
   }
