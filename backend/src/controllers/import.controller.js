@@ -3,6 +3,31 @@ import { parseSpreadsheet } from '../utils/parseSpreadsheet.js';
 import { processImport } from '../services/import.service.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
+// Normaliza un encabezado: sin tildes, minúsculas, y trata "_" y espacios como lo mismo.
+// "CODIGO INTERNO", "codigo_interno" y "Código Interno" terminan siendo la misma clave.
+const normalizeKey = (key) =>
+  key
+    .toString()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[_\s]+/g, ' ')
+    .trim();
+
+// Busca un campo en la fila probando el nombre esperado, sin importar
+// mayúsculas/minúsculas, tildes, ni espacio vs guión bajo.
+const getField = (row, ...possibleNames) => {
+  const normalizedRow = {};
+  for (const key of Object.keys(row)) {
+    normalizedRow[normalizeKey(key)] = row[key];
+  }
+  for (const name of possibleNames) {
+    const value = normalizedRow[normalizeKey(name)];
+    if (value !== undefined && value !== null && value !== '') return value;
+  }
+  return '';
+};
+
 export const importProducts = asyncHandler(async (req, res) => {
   if (!req.file) {
     const error = new Error('No se recibió ningún archivo');
@@ -15,14 +40,14 @@ export const importProducts = asyncHandler(async (req, res) => {
 
   const results = await processImport(rows, {
     mapRow: (row) => ({
-      internalCode: String(row['Codigo Interno'] || row['codigo_interno'] || '').trim(),
-      barcode: String(row['Codigo de Barras'] || row['codigo_barras'] || '').trim() || null,
-      name: String(row['Nombre'] || row['nombre'] || '').trim(),
-      brand: String(row['Marca'] || row['marca'] || '').trim() || null,
-      categoryName: String(row['Categoria'] || row['categoria'] || '').trim(),
-      price: Number(row['Precio'] || row['precio'] || 0),
-      cost: Number(row['Costo'] || row['costo'] || 0),
-      unitType: (String(row['Unidad'] || row['unidad'] || 'unit').trim() === 'peso') ? 'weight' : 'unit',
+      internalCode: String(getField(row, 'Codigo Interno')).trim(),
+      barcode: String(getField(row, 'Codigo de Barras')).trim() || null,
+      name: String(getField(row, 'Nombre')).trim(),
+      brand: String(getField(row, 'Marca')).trim() || null,
+      categoryName: String(getField(row, 'Categoria')).trim(),
+      price: Number(getField(row, 'Precio') || 0),
+      cost: Number(getField(row, 'Costo') || 0),
+      unitType: (String(getField(row, 'Unidad') || 'unidad').trim().toLowerCase() === 'peso') ? 'weight' : 'unit',
     }),
     validateRow: (data) => {
       if (!data.internalCode) return 'Falta el código interno';
@@ -61,15 +86,15 @@ export const importCustomers = asyncHandler(async (req, res) => {
 
   const results = await processImport(rows, {
     mapRow: (row) => ({
-      businessName: String(row['Razon Social'] || row['razon_social'] || '').trim() || null,
-      firstName: String(row['Nombre'] || row['nombre'] || '').trim() || null,
-      lastName: String(row['Apellido'] || row['apellido'] || '').trim() || null,
-      fiscalCondition: String(row['Condicion Fiscal'] || row['condicion_fiscal'] || '').trim(),
-      cuit: String(row['CUIT'] || row['cuit'] || '').trim() || null,
-      city: String(row['Localidad'] || row['localidad'] || '').trim() || null,
-      province: String(row['Provincia'] || row['provincia'] || '').trim() || null,
-      phone: String(row['Telefono'] || row['telefono'] || '').trim() || null,
-      email: String(row['Email'] || row['email'] || '').trim() || null,
+      businessName: String(getField(row, 'Razon Social')).trim() || null,
+      firstName: String(getField(row, 'Nombre')).trim() || null,
+      lastName: String(getField(row, 'Apellido')).trim() || null,
+      fiscalCondition: String(getField(row, 'Condicion Fiscal')).trim(),
+      cuit: String(getField(row, 'CUIT')).trim() || null,
+      city: String(getField(row, 'Localidad')).trim() || null,
+      province: String(getField(row, 'Provincia')).trim() || null,
+      phone: String(getField(row, 'Telefono')).trim() || null,
+      email: String(getField(row, 'Email')).trim() || null,
     }),
     validateRow: (data) => {
       if (!data.businessName && !data.firstName) return 'Falta razón social o nombre';
@@ -95,13 +120,13 @@ export const importSuppliers = asyncHandler(async (req, res) => {
 
   const results = await processImport(rows, {
     mapRow: (row) => ({
-      name: String(row['Nombre'] || row['nombre'] || '').trim(),
-      cuit: String(row['CUIT'] || row['cuit'] || '').trim() || null,
-      contactPerson: String(row['Contacto'] || row['contacto'] || '').trim() || null,
-      phone: String(row['Telefono'] || row['telefono'] || '').trim() || null,
-      email: String(row['Email'] || row['email'] || '').trim() || null,
-      city: String(row['Localidad'] || row['localidad'] || '').trim() || null,
-      province: String(row['Provincia'] || row['provincia'] || '').trim() || null,
+      name: String(getField(row, 'Nombre')).trim(),
+      cuit: String(getField(row, 'CUIT')).trim() || null,
+      contactPerson: String(getField(row, 'Contacto')).trim() || null,
+      phone: String(getField(row, 'Telefono')).trim() || null,
+      email: String(getField(row, 'Email')).trim() || null,
+      city: String(getField(row, 'Localidad')).trim() || null,
+      province: String(getField(row, 'Provincia')).trim() || null,
     }),
     validateRow: (data) => {
       if (!data.name) return 'Falta el nombre';
