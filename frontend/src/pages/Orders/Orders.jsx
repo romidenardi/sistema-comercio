@@ -25,6 +25,8 @@ const Orders = () => {
       customerId: '',
       paymentId: '',
       installmentPlanId: '',
+      discountPercent: 0,
+      discountAmount: 0,
       notes: '',
       newCustomer: { firstName: '', lastName: '', businessName: '', fiscalCondition: '' },
       items: [{ productId: '', quantity: 1, unitPrice: 0 }],
@@ -38,6 +40,8 @@ const Orders = () => {
   const newCustomerFiscalCondition = watch('newCustomer.fiscalCondition');
   const selectedPaymentId = watch('paymentId');
   const selectedInstallmentPlanId = watch('installmentPlanId');
+  const watchedDiscountPercent = watch('discountPercent');
+  const watchedDiscountAmount = watch('discountAmount');
 
   const loadAll = async () => {
     setLoading(true);
@@ -68,19 +72,30 @@ const Orders = () => {
     setValue('installmentPlanId', '');
   }, [selectedPaymentId, setValue]);
 
-  // Subtotal (neto), IVA y total, calculados por ítem según el IVA de cada producto
-  const { subtotal, vatAmount, total } = (watchedItems || []).reduce((acc, item) => {
+  // Importe bruto (antes de descuento), neto e IVA, calculados por ítem según el IVA de cada producto
+  const { grossSubtotal, grossVat, grossTotal } = (watchedItems || []).reduce((acc, item) => {
     const product = products.find((p) => p.id === item.productId);
     const vatRate = Number(product?.vatRate) || 0;
     const itemTotal = (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0);
     const itemNet = vatRate > 0 ? itemTotal / (1 + vatRate / 100) : itemTotal;
     const itemVat = itemTotal - itemNet;
     return {
-      subtotal: acc.subtotal + itemNet,
-      vatAmount: acc.vatAmount + itemVat,
-      total: acc.total + itemTotal,
+      grossSubtotal: acc.grossSubtotal + itemNet,
+      grossVat: acc.grossVat + itemVat,
+      grossTotal: acc.grossTotal + itemTotal,
     };
-  }, { subtotal: 0, vatAmount: 0, total: 0 });
+  }, { grossSubtotal: 0, grossVat: 0, grossTotal: 0 });
+
+  const discountPercent = Number(watchedDiscountPercent) || 0;
+  const discountAmount = Number(watchedDiscountAmount) || 0;
+  const percentDiscountValue = grossTotal * (discountPercent / 100);
+  const totalDiscount = percentDiscountValue + discountAmount;
+  const hasDiscount = totalDiscount > 0;
+  const discountExceedsTotal = totalDiscount > grossTotal;
+  const total = Math.max(grossTotal - totalDiscount, 0);
+  const scale = grossTotal > 0 ? total / grossTotal : 1;
+  const subtotal = grossSubtotal * scale;
+  const vatAmount = grossVat * scale;
 
   const selectedCustomer = customers.find((c) => c.id === selectedCustomerId);
   const fiscalConditionForCalc = isNewCustomer ? newCustomerFiscalCondition : selectedCustomer?.fiscalCondition;
@@ -100,6 +115,11 @@ const Orders = () => {
   };
 
   const onSubmit = async (formData) => {
+    if (discountExceedsTotal) {
+      showToast('El descuento no puede ser mayor al total del remito', 'error');
+      return;
+    }
+
     try {
       let customerId = formData.customerId;
 
@@ -122,6 +142,8 @@ const Orders = () => {
         customerId,
         paymentId: formData.paymentId,
         installmentPlanId: formData.installmentPlanId || null,
+        discountPercent: Number(formData.discountPercent) || 0,
+        discountAmount: Number(formData.discountAmount) || 0,
         notes: formData.notes || null,
         items: formData.items.map((item) => ({
           productId: item.productId,
@@ -136,6 +158,8 @@ const Orders = () => {
         customerId: '',
         paymentId: '',
         installmentPlanId: '',
+        discountPercent: 0,
+        discountAmount: 0,
         notes: '',
         newCustomer: { firstName: '', lastName: '', businessName: '', fiscalCondition: '' },
         items: [{ productId: '', quantity: 1, unitPrice: 0 }],
@@ -217,6 +241,32 @@ const Orders = () => {
           </div>
         )}
 
+        <div className="inline-customer-form">
+          <div className="field">
+            <label htmlFor="discountPercent">Descuento (%)</label>
+            <input
+              id="discountPercent"
+              type="number"
+              step="0.01"
+              min="0"
+              max="100"
+              placeholder="Ej: 10"
+              {...register('discountPercent')}
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="discountAmount">Descuento fijo / bono ($)</label>
+            <input
+              id="discountAmount"
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="Ej: 500"
+              {...register('discountAmount')}
+            />
+          </div>
+        </div>
+
         <div className="field">
           <label htmlFor="notes">Notas (opcional)</label>
           <input id="notes" placeholder="Ej: Entregar antes del viernes" {...register('notes')} />
@@ -277,6 +327,12 @@ const Orders = () => {
         </button>
 
         <div className="purchase-total">
+          {(discriminatesVat || hasDiscount) && (
+            <div>Importe: ${grossTotal.toFixed(2)}</div>
+          )}
+          {hasDiscount && (
+            <div>Descuento: -${totalDiscount.toFixed(2)}</div>
+          )}
           {discriminatesVat ? (
             <>
               <div>Subtotal: ${subtotal.toFixed(2)}</div>
@@ -285,6 +341,9 @@ const Orders = () => {
             </>
           ) : (
             <div>Total: ${total.toFixed(2)}</div>
+          )}
+          {discountExceedsTotal && (
+            <div className="error">El descuento no puede ser mayor al total</div>
           )}
 
           {selectedPlan && (
@@ -296,7 +355,7 @@ const Orders = () => {
           )}
         </div>
 
-        <button type="submit">Generar remito</button>
+        <button type="submit" disabled={discountExceedsTotal}>Generar remito</button>
       </form>
 
       <div className="table-wrapper">

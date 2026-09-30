@@ -18,6 +18,9 @@ const OrderPrint = () => {
   const customerLabel = order.Customer.businessName
     || `${order.Customer.firstName} ${order.Customer.lastName || ''}`.trim();
 
+  const hasDiscount = Number(order.discountPercent) > 0 || Number(order.discountAmount) > 0;
+  const totalDiscount = Number(order.grossTotal || 0) - Number(order.total || 0);
+
   return (
     <div className="print-page">
       <div className="print-actions no-print">
@@ -64,6 +67,19 @@ const OrderPrint = () => {
         </table>
 
         <div className="print-total">
+          {hasDiscount && (
+            <>
+              <p>Importe: ${Number(order.grossTotal).toFixed(2)}</p>
+              <p>
+                Descuento: -${totalDiscount.toFixed(2)}
+                {Number(order.discountPercent) > 0 && ` (${order.discountPercent}%`}
+                {Number(order.discountPercent) > 0 && Number(order.discountAmount) > 0 && ' + '}
+                {Number(order.discountAmount) > 0 && `bono $${Number(order.discountAmount).toFixed(2)}`}
+                {Number(order.discountPercent) > 0 && ')'}
+              </p>
+            </>
+          )}
+
           {order.discriminatesVat ? (
             <>
               <p>Subtotal: ${Number(order.subtotal).toFixed(2)}</p>

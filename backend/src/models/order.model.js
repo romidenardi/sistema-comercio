@@ -33,10 +33,27 @@ const Order = sequelize.define('Order', {
     allowNull: false,
     defaultValue: DataTypes.NOW,
   },
-  total: {
+  grossTotal: {
+    type: DataTypes.DECIMAL(12, 2),
+    allowNull: true, // suma de los ítems antes de aplicar descuentos
+    field: 'gross_total',
+  },
+  discountPercent: {
+    type: DataTypes.DECIMAL(5, 2),
+    allowNull: false,
+    defaultValue: 0,
+    field: 'discount_percent',
+  },
+  discountAmount: {
     type: DataTypes.DECIMAL(12, 2),
     allowNull: false,
     defaultValue: 0,
+    field: 'discount_amount', // descuento fijo tipo bono
+  },
+  total: {
+    type: DataTypes.DECIMAL(12, 2),
+    allowNull: false,
+    defaultValue: 0, // total final, ya con descuentos aplicados
   },
   subtotal: {
     type: DataTypes.DECIMAL(12, 2),
