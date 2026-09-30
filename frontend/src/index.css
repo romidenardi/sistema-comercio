@@ -114,6 +114,35 @@ a {
   border-color: rgba(255, 255, 255, 0.4);
 }
 
+.sidebar-user {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 12px 0 18px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.sidebar-user-name {
+  display: block;
+  font-weight: 600;
+  font-size: 1rem;
+  color: #fff;
+}
+
+.sidebar-user-role {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.15);
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+
 .app-main {
   flex: 1;
   padding: 32px 40px;

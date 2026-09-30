@@ -1,8 +1,6 @@
 import { Order, OrderItem, Product, Customer, Payment, InstallmentPlan, StockMovement, sequelize } from '../models/index.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
-// Condiciones fiscales para las que el remito discrimina IVA (Subtotal + IVA + Total).
-// El resto muestra un único Total con IVA incluido, sin desglosar.
 const FISCAL_CONDITIONS_WITH_VAT_BREAKDOWN = ['Responsable Inscripto'];
 
 export const getOrders = asyncHandler(async (req, res) => {
@@ -37,7 +35,7 @@ export const getOrder = asyncHandler(async (req, res) => {
 });
 
 export const createOrder = asyncHandler(async (req, res) => {
-  const { customerId, paymentId, installmentPlanId, items, notes } = req.body;
+  const { customerId, paymentId, installmentPlanId, items, notes, discountPercent, discountAmount } = req.body;
 
   if (!items || items.length === 0) {
     const error = new Error('El pedido debe tener al menos un artículo');
@@ -82,9 +80,9 @@ export const createOrder = asyncHandler(async (req, res) => {
 
     const discriminatesVat = FISCAL_CONDITIONS_WITH_VAT_BREAKDOWN.includes(customer.fiscalCondition);
 
-    let subtotal = 0;
-    let vatAmount = 0;
-    let total = 0;
+    let grossSubtotal = 0;
+    let grossVat = 0;
+    let grossTotal = 0;
     const validatedItems = [];
 
     for (const item of items) {
@@ -108,12 +106,30 @@ export const createOrder = asyncHandler(async (req, res) => {
       const itemNet = vatRate > 0 ? itemTotal / (1 + vatRate / 100) : itemTotal;
       const itemVat = itemTotal - itemNet;
 
-      subtotal += itemNet;
-      vatAmount += itemVat;
-      total += itemTotal;
+      grossSubtotal += itemNet;
+      grossVat += itemVat;
+      grossTotal += itemTotal;
 
       validatedItems.push({ product, quantity: item.quantity, unitPrice: item.unitPrice });
     }
+
+    const appliedDiscountPercent = Number(discountPercent) || 0;
+    const appliedDiscountAmount = Number(discountAmount) || 0;
+    const totalDiscount = grossTotal * (appliedDiscountPercent / 100) + appliedDiscountAmount;
+
+    if (totalDiscount > grossTotal) {
+      const error = new Error('El descuento no puede ser mayor al total del remito');
+      error.status = 400;
+      throw error;
+    }
+
+    // Total final ya con descuentos aplicados
+    const total = grossTotal - totalDiscount;
+
+    // Si discrimina IVA, achico subtotal e IVA en la misma proporción que se achicó el total
+    const scale = grossTotal > 0 ? total / grossTotal : 1;
+    const subtotal = discriminatesVat ? grossSubtotal * scale : null;
+    const vatAmount = discriminatesVat ? grossVat * scale : null;
 
     let installmentsCount = null;
     let interestRate = null;
@@ -132,9 +148,12 @@ export const createOrder = asyncHandler(async (req, res) => {
       paymentId,
       installmentPlanId: installmentPlan ? installmentPlan.id : null,
       notes,
+      grossTotal,
+      discountPercent: appliedDiscountPercent,
+      discountAmount: appliedDiscountAmount,
       total,
-      subtotal: discriminatesVat ? subtotal : null,
-      vatAmount: discriminatesVat ? vatAmount : null,
+      subtotal,
+      vatAmount,
       discriminatesVat,
       installmentsCount,
       interestRate,
