@@ -1,8 +1,14 @@
 import { Outlet, NavLink } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
 
+const ROLE_LABELS = {
+  admin: 'Administrador',
+  editor: 'Editor',
+  operador: 'Operador',
+};
+
 const Layout = () => {
-  const { logout, role } = useAuth();
+  const { logout, role, user } = useAuth();
 
   const handleLogout = () => {
     if (confirm('¿Cerrar sesión?')) {
@@ -17,6 +23,14 @@ const Layout = () => {
     <div className="app-layout">
       <aside className="sidebar">
         <div className="sidebar-brand">Sistema comercio</div>
+
+        {user && (
+          <div className="sidebar-user">
+            <span className="sidebar-user-name">{user.name}</span>
+            <span className="sidebar-user-role">{ROLE_LABELS[role] || role}</span>
+          </div>
+        )}
+
         <nav className="sidebar-nav">
           <NavLink to="/" end>Inicio</NavLink>
           {canManageData && <NavLink to="/products">Productos</NavLink>}
