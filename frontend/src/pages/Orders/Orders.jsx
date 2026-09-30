@@ -10,6 +10,7 @@ import Spinner from '../../components/common/Spinner.jsx';
 
 const NEW_CUSTOMER = '__new__';
 const FISCAL_CONDITIONS = ['Consumidor Final', 'Responsable Inscripto', 'Monotributista', 'Exento'];
+const FISCAL_CONDITIONS_WITH_VAT_BREAKDOWN = ['Responsable Inscripto'];
 
 const Orders = () => {
   const [orders, setOrders] = useState([]);
@@ -23,6 +24,7 @@ const Orders = () => {
     defaultValues: {
       customerId: '',
       paymentId: '',
+      installmentPlanId: '',
       notes: '',
       newCustomer: { firstName: '', lastName: '', businessName: '', fiscalCondition: '' },
       items: [{ productId: '', quantity: 1, unitPrice: 0 }],
@@ -33,6 +35,9 @@ const Orders = () => {
   const watchedItems = watch('items');
   const selectedCustomerId = watch('customerId');
   const isNewCustomer = selectedCustomerId === NEW_CUSTOMER;
+  const newCustomerFiscalCondition = watch('newCustomer.fiscalCondition');
+  const selectedPaymentId = watch('paymentId');
+  const selectedInstallmentPlanId = watch('installmentPlanId');
 
   const loadAll = async () => {
     setLoading(true);
@@ -58,10 +63,34 @@ const Orders = () => {
     loadAll();
   }, []);
 
-  const total = (watchedItems || []).reduce(
-    (sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0),
-    0
-  );
+  // Al cambiar la forma de pago, reseteo el plan de cuotas elegido
+  useEffect(() => {
+    setValue('installmentPlanId', '');
+  }, [selectedPaymentId, setValue]);
+
+  // Subtotal (neto), IVA y total, calculados por ítem según el IVA de cada producto
+  const { subtotal, vatAmount, total } = (watchedItems || []).reduce((acc, item) => {
+    const product = products.find((p) => p.id === item.productId);
+    const vatRate = Number(product?.vatRate) || 0;
+    const itemTotal = (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0);
+    const itemNet = vatRate > 0 ? itemTotal / (1 + vatRate / 100) : itemTotal;
+    const itemVat = itemTotal - itemNet;
+    return {
+      subtotal: acc.subtotal + itemNet,
+      vatAmount: acc.vatAmount + itemVat,
+      total: acc.total + itemTotal,
+    };
+  }, { subtotal: 0, vatAmount: 0, total: 0 });
+
+  const selectedCustomer = customers.find((c) => c.id === selectedCustomerId);
+  const fiscalConditionForCalc = isNewCustomer ? newCustomerFiscalCondition : selectedCustomer?.fiscalCondition;
+  const discriminatesVat = FISCAL_CONDITIONS_WITH_VAT_BREAKDOWN.includes(fiscalConditionForCalc);
+
+  const selectedPayment = payments.find((p) => p.id === selectedPaymentId);
+  const availablePlans = selectedPayment?.installmentPlans || [];
+  const selectedPlan = availablePlans.find((p) => p.id === selectedInstallmentPlanId);
+  const totalFinanced = selectedPlan ? total * (1 + Number(selectedPlan.interestRate) / 100) : total;
+  const installmentAmount = selectedPlan ? totalFinanced / selectedPlan.installments : null;
 
   const onProductChange = (index, productId) => {
     const product = products.find((p) => p.id === productId);
@@ -92,6 +121,7 @@ const Orders = () => {
       const payload = {
         customerId,
         paymentId: formData.paymentId,
+        installmentPlanId: formData.installmentPlanId || null,
         notes: formData.notes || null,
         items: formData.items.map((item) => ({
           productId: item.productId,
@@ -105,6 +135,7 @@ const Orders = () => {
       reset({
         customerId: '',
         paymentId: '',
+        installmentPlanId: '',
         notes: '',
         newCustomer: { firstName: '', lastName: '', businessName: '', fiscalCondition: '' },
         items: [{ productId: '', quantity: 1, unitPrice: 0 }],
@@ -172,6 +203,20 @@ const Orders = () => {
           </select>
         </div>
 
+        {availablePlans.length > 0 && (
+          <div className="field">
+            <label htmlFor="installmentPlanId">Plan de cuotas</label>
+            <select id="installmentPlanId" {...register('installmentPlanId')}>
+              <option value="">Pago único (sin financiación)</option>
+              {availablePlans.map((plan) => (
+                <option key={plan.id} value={plan.id}>
+                  {plan.installments} cuotas {Number(plan.interestRate) > 0 ? `(+${plan.interestRate}% interés)` : '(sin interés)'}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
         <div className="field">
           <label htmlFor="notes">Notas (opcional)</label>
           <input id="notes" placeholder="Ej: Entregar antes del viernes" {...register('notes')} />
@@ -231,7 +276,25 @@ const Orders = () => {
           + Agregar producto
         </button>
 
-        <div className="purchase-total">Total: ${total.toFixed(2)}</div>
+        <div className="purchase-total">
+          {discriminatesVat ? (
+            <>
+              <div>Subtotal: ${subtotal.toFixed(2)}</div>
+              <div>IVA: ${vatAmount.toFixed(2)}</div>
+              <div>Total: ${total.toFixed(2)}</div>
+            </>
+          ) : (
+            <div>Total: ${total.toFixed(2)}</div>
+          )}
+
+          {selectedPlan && (
+            <>
+              <div>Cantidad de cuotas: {selectedPlan.installments}</div>
+              <div>Monto de cada cuota: ${installmentAmount.toFixed(2)}</div>
+              <div>Precio total financiado: ${totalFinanced.toFixed(2)}</div>
+            </>
+          )}
+        </div>
 
         <button type="submit">Generar remito</button>
       </form>
@@ -253,7 +316,7 @@ const Orders = () => {
                 <td data-label="Fecha">{new Date(order.date).toLocaleDateString('es-AR')}</td>
                 <td data-label="Cliente">{displayCustomer(order)}</td>
                 <td data-label="Forma de pago">{order.Payment?.name || '—'}</td>
-                <td data-label="Total">${Number(order.total).toFixed(2)}</td>
+                <td data-label="Total">${Number(order.totalFinanced || order.total).toFixed(2)}</td>
                 <td data-label="Acciones">
                   <Link to={`/orders/${order.id}/print`}>
                     <button type="button">Ver / Imprimir</button>
