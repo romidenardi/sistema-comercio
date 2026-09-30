@@ -63,7 +63,25 @@ const OrderPrint = () => {
           </tbody>
         </table>
 
-        <div className="print-total">Total: ${Number(order.total).toFixed(2)}</div>
+        <div className="print-total">
+          {order.discriminatesVat ? (
+            <>
+              <p>Subtotal: ${Number(order.subtotal).toFixed(2)}</p>
+              <p>IVA: ${Number(order.vatAmount).toFixed(2)}</p>
+              <p><strong>Total: ${Number(order.total).toFixed(2)}</strong></p>
+            </>
+          ) : (
+            <p><strong>Total: ${Number(order.total).toFixed(2)}</strong></p>
+          )}
+
+          {order.installmentsCount && (
+            <>
+              <p>Plan: {order.installmentsCount} cuotas {Number(order.interestRate) > 0 ? `(+${order.interestRate}% interés)` : '(sin interés)'}</p>
+              <p>Monto de cada cuota: ${Number(order.installmentAmount).toFixed(2)}</p>
+              <p><strong>Total financiado: ${Number(order.totalFinanced).toFixed(2)}</strong></p>
+            </>
+          )}
+        </div>
 
         <p className="print-payment">Forma de pago: {order.Payment?.name}</p>
         {order.notes && <p className="print-notes">Notas: {order.notes}</p>}

@@ -1,5 +1,9 @@
-import { Order, OrderItem, Product, Customer, Payment, StockMovement, sequelize } from '../models/index.js';
+import { Order, OrderItem, Product, Customer, Payment, InstallmentPlan, StockMovement, sequelize } from '../models/index.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
+
+// Condiciones fiscales para las que el remito discrimina IVA (Subtotal + IVA + Total).
+// El resto muestra un único Total con IVA incluido, sin desglosar.
+const FISCAL_CONDITIONS_WITH_VAT_BREAKDOWN = ['Responsable Inscripto'];
 
 export const getOrders = asyncHandler(async (req, res) => {
   const orders = await Order.findAll({
@@ -33,7 +37,7 @@ export const getOrder = asyncHandler(async (req, res) => {
 });
 
 export const createOrder = asyncHandler(async (req, res) => {
-  const { customerId, paymentId, items, notes } = req.body;
+  const { customerId, paymentId, installmentPlanId, items, notes } = req.body;
 
   if (!items || items.length === 0) {
     const error = new Error('El pedido debe tener al menos un artículo');
@@ -63,6 +67,23 @@ export const createOrder = asyncHandler(async (req, res) => {
       throw error;
     }
 
+    let installmentPlan = null;
+    if (installmentPlanId) {
+      installmentPlan = await InstallmentPlan.findOne({
+        where: { id: installmentPlanId, paymentId: payment.id },
+        transaction: t,
+      });
+      if (!installmentPlan) {
+        const error = new Error('Plan de cuotas no encontrado');
+        error.status = 404;
+        throw error;
+      }
+    }
+
+    const discriminatesVat = FISCAL_CONDITIONS_WITH_VAT_BREAKDOWN.includes(customer.fiscalCondition);
+
+    let subtotal = 0;
+    let vatAmount = 0;
     let total = 0;
     const validatedItems = [];
 
@@ -81,15 +102,44 @@ export const createOrder = asyncHandler(async (req, res) => {
         error.status = 400;
         throw error;
       }
-      total += item.quantity * item.unitPrice;
+
+      const itemTotal = item.quantity * item.unitPrice;
+      const vatRate = Number(product.vatRate) || 0;
+      const itemNet = vatRate > 0 ? itemTotal / (1 + vatRate / 100) : itemTotal;
+      const itemVat = itemTotal - itemNet;
+
+      subtotal += itemNet;
+      vatAmount += itemVat;
+      total += itemTotal;
+
       validatedItems.push({ product, quantity: item.quantity, unitPrice: item.unitPrice });
+    }
+
+    let installmentsCount = null;
+    let interestRate = null;
+    let installmentAmount = null;
+    let totalFinanced = null;
+
+    if (installmentPlan) {
+      installmentsCount = installmentPlan.installments;
+      interestRate = Number(installmentPlan.interestRate);
+      totalFinanced = total * (1 + interestRate / 100);
+      installmentAmount = totalFinanced / installmentsCount;
     }
 
     const order = await Order.create({
       customerId,
       paymentId,
+      installmentPlanId: installmentPlan ? installmentPlan.id : null,
       notes,
       total,
+      subtotal: discriminatesVat ? subtotal : null,
+      vatAmount: discriminatesVat ? vatAmount : null,
+      discriminatesVat,
+      installmentsCount,
+      interestRate,
+      installmentAmount,
+      totalFinanced,
       businessId: req.user.businessId,
     }, { transaction: t });
 
