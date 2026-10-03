@@ -31,7 +31,6 @@ StockMovement.belongsTo(Product, { foreignKey: 'productId' });
 Business.hasMany(Payment, { foreignKey: 'businessId' });
 Payment.belongsTo(Business, { foreignKey: 'businessId' });
 
-// Payment → InstallmentPlans
 Payment.hasMany(InstallmentPlan, { as: 'installmentPlans', foreignKey: 'paymentId' });
 InstallmentPlan.belongsTo(Payment, { foreignKey: 'paymentId' });
 
@@ -56,27 +55,21 @@ PurchaseItem.belongsTo(Purchase, { foreignKey: 'purchaseId' });
 Product.hasMany(PurchaseItem, { foreignKey: 'productId' });
 PurchaseItem.belongsTo(Product, { foreignKey: 'productId' });
 
-// Business → Orders
 Business.hasMany(Order, { foreignKey: 'businessId' });
 Order.belongsTo(Business, { foreignKey: 'businessId' });
 
-// Customer → Orders
 Customer.hasMany(Order, { foreignKey: 'customerId' });
 Order.belongsTo(Customer, { foreignKey: 'customerId' });
 
-// Payment → Orders
 Payment.hasMany(Order, { foreignKey: 'paymentId' });
 Order.belongsTo(Payment, { foreignKey: 'paymentId' });
 
-// InstallmentPlan → Orders
 InstallmentPlan.hasMany(Order, { foreignKey: 'installmentPlanId' });
 Order.belongsTo(InstallmentPlan, { foreignKey: 'installmentPlanId' });
 
-// Order → OrderItems
 Order.hasMany(OrderItem, { as: 'items', foreignKey: 'orderId' });
 OrderItem.belongsTo(Order, { foreignKey: 'orderId' });
 
-// Product → OrderItems
 Product.hasMany(OrderItem, { foreignKey: 'productId' });
 OrderItem.belongsTo(Product, { foreignKey: 'productId' });
 

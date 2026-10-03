@@ -3,8 +3,6 @@ import { parseSpreadsheet } from '../utils/parseSpreadsheet.js';
 import { processImport } from '../services/import.service.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
-// Normaliza un encabezado: sin tildes, minúsculas, y trata "_" y espacios como lo mismo.
-// "CODIGO INTERNO", "codigo_interno" y "Código Interno" terminan siendo la misma clave.
 const normalizeKey = (key) =>
   key
     .toString()
@@ -14,8 +12,6 @@ const normalizeKey = (key) =>
     .replace(/[_\s]+/g, ' ')
     .trim();
 
-// Busca un campo en la fila probando el nombre esperado, sin importar
-// mayúsculas/minúsculas, tildes, ni espacio vs guión bajo.
 const getField = (row, ...possibleNames) => {
   const normalizedRow = {};
   for (const key of Object.keys(row)) {
