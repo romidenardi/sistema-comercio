@@ -17,7 +17,7 @@ const createRules = [
   body('name').notEmpty().withMessage('El nombre es obligatorio'),
   body('price').isFloat({ min: 0 }).withMessage('El precio debe ser un número positivo'),
   body('cost').isFloat({ min: 0 }).withMessage('El costo debe ser un número positivo'),
-  body('unitType').isIn(['unit', 'weight']).withMessage('unitType debe ser "unit" o "weight"'),
+  body('unitType').isIn(['unit', 'weight']).withMessage('unitType debe ser "unidad" o "peso"'),
 ];
 
 router.get('/', getProducts);

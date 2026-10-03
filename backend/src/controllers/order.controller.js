@@ -123,10 +123,7 @@ export const createOrder = asyncHandler(async (req, res) => {
       throw error;
     }
 
-    // Total final ya con descuentos aplicados
     const total = grossTotal - totalDiscount;
-
-    // Si discrimina IVA, achico subtotal e IVA en la misma proporción que se achicó el total
     const scale = grossTotal > 0 ? total / grossTotal : 1;
     const subtotal = discriminatesVat ? grossSubtotal * scale : null;
     const vatAmount = discriminatesVat ? grossVat * scale : null;

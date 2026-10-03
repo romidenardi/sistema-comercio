@@ -39,7 +39,7 @@ export const register = async (req, res) => {
     const { passwordHash: _, ...userSafe } = user.toJSON();
     res.status(201).json(userSafe);
   } catch (error) {
-    res.status(400).json({ message: 'Error creating user', error: error.message });
+    res.status(400).json({ message: 'Error al crear el usuario', error: error.message });
   }
 };
 
@@ -72,6 +72,6 @@ export const login = async (req, res) => {
       user: { id: user.id, name: user.name, email: user.email, role: user.role },
     });
   } catch (error) {
-    res.status(500).json({ message: 'Error logging in', error: error.message });
+    res.status(500).json({ message: 'Error al iniciar sesión', error: error.message });
   }
 };
