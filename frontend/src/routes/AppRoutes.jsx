@@ -1,6 +1,8 @@
 import { Routes, Route } from 'react-router-dom';
 import Login from '../pages/Login/Login.jsx';
 import Activate from '../pages/Activate/Activate.jsx';
+import PlatformLogin from '../pages/Platform/PlatformLogin.jsx';
+import Platform from '../pages/Platform/Platform.jsx';
 import Categories from '../pages/Categories/Categories.jsx';
 import Payments from '../pages/Payments/Payments.jsx';
 import Customers from '../pages/Customers/Customers.jsx';
@@ -20,6 +22,8 @@ const AppRoutes = () => {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/activar" element={<Activate />} />
+      <Route path="/plataforma/login" element={<PlatformLogin />} />
+      <Route path="/plataforma" element={<Platform />} />
 
       <Route element={<PrivateRoute />}>
         <Route path="/orders/:id/print" element={<OrderPrint />} />
