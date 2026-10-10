@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import api from '../../api/axios';
+import { LEGAL_VERSION } from '../../legal/legalContent';
 
 export default function Activate() {
   const [searchParams] = useSearchParams();
@@ -9,6 +10,7 @@ export default function Activate() {
 
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
+  const [accepted, setAccepted] = useState(false);
   const [error, setError] = useState('');
   const [done, setDone] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -19,10 +21,16 @@ export default function Activate() {
 
     if (password.length < 8) return setError('La contraseña debe tener al menos 8 caracteres');
     if (password !== confirm) return setError('Las contraseñas no coinciden');
+    if (!accepted) return setError('Tenés que aceptar los Términos y el Aviso de privacidad');
 
     setLoading(true);
     try {
-      await api.post('/auth/activate', { token, password });
+      await api.post('/auth/activate', {
+        token,
+        password,
+        acceptTerms: true,
+        legalVersion: LEGAL_VERSION,
+      });
       setDone(true);
       setTimeout(() => navigate('/login'), 2500);
     } catch (err) {
@@ -62,6 +70,20 @@ export default function Activate() {
               <input id="confirm" type="password" autoComplete="new-password"
                 value={confirm} onChange={(e) => setConfirm(e.target.value)} />
             </div>
+
+            <label className="terms-check">
+              <input type="checkbox" checked={accepted}
+                onChange={(e) => setAccepted(e.target.checked)} />
+              <span>
+                Leí y acepto los{' '}
+                <Link to="/terminos" target="_blank" rel="noopener noreferrer">Términos de la beta</Link>
+                {' '}y el{' '}
+                <Link to="/privacidad" target="_blank" rel="noopener noreferrer">Aviso de privacidad</Link>.
+                Entiendo que durante la beta no hay copias de seguridad garantizadas y que mis datos
+                pueden almacenarse en servidores fuera de Argentina.
+              </span>
+            </label>
+
             {error && <p className="auth-error">{error}</p>}
             <button type="submit" disabled={loading}>
               {loading ? 'Guardando…' : 'Crear contraseña'}

@@ -17,6 +17,10 @@ const User = sequelize.define('User', {
   inviteTokenHash: { type: DataTypes.STRING(64), allowNull: true, field: 'invite_token_hash' },
   inviteExpiresAt: { type: DataTypes.DATE, allowNull: true, field: 'invite_expires_at' },
   lastLoginAt: { type: DataTypes.DATE, allowNull: true, field: 'last_login_at' },
+  // Aceptación de términos y privacidad (evidencia)
+  termsVersion: { type: DataTypes.STRING(40), allowNull: true, field: 'terms_version' },
+  termsAcceptedAt: { type: DataTypes.DATE, allowNull: true, field: 'terms_accepted_at' },
+  termsAcceptedIp: { type: DataTypes.STRING(64), allowNull: true, field: 'terms_accepted_ip' },
   role: {
     type: DataTypes.ENUM('admin', 'editor', 'operador'),
     allowNull: false,
