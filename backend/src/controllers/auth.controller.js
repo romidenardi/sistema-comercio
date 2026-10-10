@@ -4,6 +4,7 @@ import { User, Business } from '../models/index.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { httpError } from '../utils/httpError.js';
 import { hashToken } from '../utils/inviteToken.js';
+import { LEGAL_VERSION } from '../utils/legal.js';
 
 const MIN_PASSWORD_LENGTH = 8;
 const MAX_PASSWORD_LENGTH = 72; // límite de bcrypt
@@ -57,6 +58,14 @@ export const activateAccount = asyncHandler(async (req, res) => {
     throw httpError(`La contraseña debe tener entre ${MIN_PASSWORD_LENGTH} y ${MAX_PASSWORD_LENGTH} caracteres`);
   }
 
+  // Aceptación obligatoria de la versión vigente de términos y privacidad
+  if (req.body.acceptTerms !== true) {
+    throw httpError('Tenés que aceptar los Términos y el Aviso de privacidad para continuar');
+  }
+  if (req.body.legalVersion !== LEGAL_VERSION) {
+    throw httpError('Los términos se actualizaron. Recargá la página e intentá de nuevo.');
+  }
+
   const user = await User.findOne({ where: { inviteTokenHash: hashToken(token) } });
   if (!user || !user.inviteExpiresAt || user.inviteExpiresAt < new Date()) {
     throw httpError('El link de activación es inválido o venció. Pedí uno nuevo.');
@@ -65,6 +74,9 @@ export const activateAccount = asyncHandler(async (req, res) => {
   user.passwordHash = await bcrypt.hash(password, 10);
   user.inviteTokenHash = null;
   user.inviteExpiresAt = null;
+  user.termsVersion = LEGAL_VERSION;
+  user.termsAcceptedAt = new Date();
+  user.termsAcceptedIp = String(req.ip || '').slice(0, 64);
   await user.save();
 
   res.json({ message: 'Contraseña creada. Ya podés iniciar sesión.' });

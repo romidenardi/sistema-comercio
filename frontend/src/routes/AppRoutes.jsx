@@ -1,6 +1,8 @@
 import { Routes, Route } from 'react-router-dom';
 import Login from '../pages/Login/Login.jsx';
 import Activate from '../pages/Activate/Activate.jsx';
+import Terms from '../pages/Legal/Terms.jsx';
+import Privacy from '../pages/Legal/Privacy.jsx';
 import PlatformLogin from '../pages/Platform/PlatformLogin.jsx';
 import Platform from '../pages/Platform/Platform.jsx';
 import Categories from '../pages/Categories/Categories.jsx';
@@ -22,6 +24,8 @@ const AppRoutes = () => {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/activar" element={<Activate />} />
+      <Route path="/terminos" element={<Terms />} />
+      <Route path="/privacidad" element={<Privacy />} />
       <Route path="/plataforma/login" element={<PlatformLogin />} />
       <Route path="/plataforma" element={<Platform />} />
 
