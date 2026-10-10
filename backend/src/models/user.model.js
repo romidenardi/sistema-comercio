@@ -3,41 +3,26 @@ const { DataTypes } = pkg;
 import sequelize from '../config/database.js';
 
 const User = sequelize.define('User', {
-  id: {
-    type: DataTypes.UUID,
-    defaultValue: DataTypes.UUIDV4,
-    primaryKey: true,
-  },
-  businessId: {
-    type: DataTypes.UUID,
-    allowNull: false,
-    field: 'business_id',
-  },
-  name: {
-    type: DataTypes.STRING,
-    allowNull: false,
-  },
+  id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
+  businessId: { type: DataTypes.UUID, allowNull: false, field: 'business_id' },
+  name: { type: DataTypes.STRING, allowNull: false },
   email: {
     type: DataTypes.STRING,
     allowNull: false,
     unique: true,
     validate: { isEmail: true },
   },
-  passwordHash: {
-    type: DataTypes.STRING,
-    allowNull: false,
-    field: 'password_hash',
-  },
+  // null mientras la cuenta espera ser activada con el link de invitación
+  passwordHash: { type: DataTypes.STRING, allowNull: true, field: 'password_hash' },
+  inviteTokenHash: { type: DataTypes.STRING(64), allowNull: true, field: 'invite_token_hash' },
+  inviteExpiresAt: { type: DataTypes.DATE, allowNull: true, field: 'invite_expires_at' },
+  lastLoginAt: { type: DataTypes.DATE, allowNull: true, field: 'last_login_at' },
   role: {
     type: DataTypes.ENUM('admin', 'editor', 'operador'),
     allowNull: false,
     defaultValue: 'operador',
   },
-  active: {
-    type: DataTypes.BOOLEAN,
-    allowNull: false,
-    defaultValue: true,
-  },
+  active: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: true },
 }, {
   tableName: 'users',
 });
