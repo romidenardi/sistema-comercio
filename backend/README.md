@@ -1,122 +1,94 @@
-# Sistema de stock y clientes — Backend
+# Talarix: Backend
 
-API REST para administrar stock, clientes, productos, compras, remitos y facturación de pequeños comercios. Pensado como single-tenant hoy, con el modelo de datos preparado para escalar a multi-tenant más adelante.
+API de gestión para pequeños comercios (stock, clientes, proveedores, compras, remitos, formas de pago, cuotas, descuentos e IVA). Multi-comercio: una sola base de datos, con los datos de cada comercio separados por `businessId`.
 
-## Stack
+**Stack:** Node.js, Express, Sequelize, MySQL. Desplegado en Railway.
 
-- Node.js + Express (patrón MVC)
-- Sequelize + MySQL
-- Autenticación con JWT y sistema de roles (admin / editor / operador)
-- Validación con express-validator
-- Importación de productos, clientes y proveedores desde Excel (multer + xlsx)
+## Entornos
 
-## Requisitos previos
+| Entorno | Rama | Backend | Frontend |
+|---|---|---|---|
+| Producción | `main` | Railway (production) | Vercel (production) |
+| Staging | `staging` | Railway (staging, base propia) | Vercel (preview de la rama `staging`) |
 
-- Node.js 18 o superior
-- MySQL 8 (local, Docker, o un proveedor en la nube)
+Los cambios se prueban primero en `staging` y después se pasan a `main` (ver "Flujo de trabajo").
 
-## Instalación
+## Requisitos
+- Node.js (versión recomendada: 20 o superior) (verificar)
+- MySQL local o acceso a una base de desarrollo
 
+## Puesta en marcha local
 ```bash
-cd backend
 npm install
+cp .env.example .env   # si no existe, crear .env con las variables de abajo
+npm run dev
 ```
 
 ## Variables de entorno
 
-Copiá `.env.example` a `.env` y completá con tus datos:
+El servidor valida las variables al arrancar y no inicia si faltan las obligatorias.
 
-```dotenv
-DB_HOST=127.0.0.1
-DB_PORT=3306
-DB_NAME=sistema_comercio
-DB_USER=root
-DB_PASSWORD=
-JWT_SECRET=
-PORT=3000
-BUSINESS_ID_DEFAULT=
-```
-
-- `DB_*`: credenciales de conexión a MySQL.
-- `JWT_SECRET`: cualquier string largo y aleatorio, usado para firmar los tokens de sesión (duran 8hs).
-- `BUSINESS_ID_DEFAULT`: se completa después del primer arranque (ver abajo).
-
-## Cómo levantar el proyecto
-
-```bash
-npm run dev
-```
-
-En el primer arranque, si no existe ningún comercio en la base, el sistema crea uno automáticamente y muestra su `id` en consola. Copiá ese valor a `BUSINESS_ID_DEFAULT` en tu `.env` y reiniciá el servidor.
-
-Al conectar correctamente vas a ver en consola:
-Conexión a MySQL exitosa
-Servidor corriendo en puerto 3000
-
-
-⚠️ Cuando cambiás un modelo que ya tiene columnas en una base con datos reales, Sequelize no las migra solo — hay que correr un `ALTER TABLE` manual en MySQL. Si no estás segura de si un cambio lo necesita, preguntame antes de deployar.
-
-## Autenticación y roles
-
-Todos los endpoints, salvo `/api/auth/*`, requieren un token JWT.
-
-1. Registrar el primer usuario del comercio: `POST /api/auth/register` → se crea automáticamente como **admin**. Una vez que existe un admin, este endpoint queda cerrado (403); los usuarios siguientes se crean desde `/api/users`.
-2. Loguearse: `POST /api/auth/login` → devuelve `{ token, user: { id, name, email, role } }`
-3. Enviar el token en cada request protegido: header `Authorization: Bearer <token>`
-
-Hay tres roles:
-
-| Rol | Puede |
+| Variable | Descripción |
 |---|---|
-| `admin` | Todo, incluida la gestión de usuarios |
-| `editor` | Todo excepto gestión de usuarios |
-| `operador` | Solo cargar Compras y Remitos (puede leer productos/clientes/proveedores/formas de pago para completar esos formularios) |
+| `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` | Conexión a MySQL |
+| `JWT_SECRET` | Firma de los tokens de usuarios (8 h) |
+| `PLATFORM_JWT_SECRET` | Firma de los tokens del superadmin (2 h). Debe ser **distinta** de `JWT_SECRET` |
+| `APP_URL` | URL pública del frontend (se usa en los links de invitación) |
+| `CORS_ORIGIN` | Origen(es) permitido(s) del frontend, sin barra final |
+| `NODE_ENV` | `production` en Railway (oculta detalles de errores) |
+| `DEMO_RESET_ENABLED` | `false` desactiva el reinicio nocturno de la demo (en staging va en `false`) |
 
-## Endpoints
+En Railway, los `DB_*` se cargan como referencias a la base del propio entorno, por ejemplo `${{MySQL.MYSQLHOST}}`. Nunca uses los secretos de producción en staging.
 
-| Recurso | Método | Ruta |
-|---|---|---|
-| Auth | POST | `/api/auth/register` `/api/auth/login` |
-| Usuarios (solo admin) | GET / POST / PUT / DELETE | `/api/users` `/api/users/:id` |
-| Categorías | GET / POST / PUT / DELETE | `/api/categories` `/api/categories/:id` |
-| Productos | GET / POST / PUT / DELETE | `/api/products` `/api/products/:id` |
-| Productos | GET | `/api/products/barcode/:barcode` |
-| Formas de pago (con planes de cuotas anidados) | GET / POST / PUT / DELETE | `/api/payments` `/api/payments/:id` |
-| Clientes | GET / POST / PUT / DELETE | `/api/customers` `/api/customers/:id` |
-| Proveedores | GET / POST / PUT / DELETE | `/api/suppliers` `/api/suppliers/:id` |
-| Compras | GET / POST | `/api/purchases` |
-| Remitos | GET / POST | `/api/orders` `/api/orders/:id` |
-| Movimientos de stock | GET | `/api/stock-movements/product/:productId` |
-| Movimientos de stock | POST | `/api/stock-movements` |
-| Importación (Excel) | POST | `/api/imports/products` `/api/imports/customers` `/api/imports/suppliers` |
+## Estructura
+```
+controllers/   lógica de cada recurso
+routes/        definición de rutas
+models/        modelos Sequelize
+middlewares/   auth, roles, plataforma, demo, errores
+services/      servicios (p. ej. datos de la cuenta demo)
+jobs/          tareas programadas (reinicio nocturno de la demo)
+utils/         ayudas (pick, números, tokens de invitación, versión de términos)
+scripts/       scripts de operación (crear superadmin)
+```
+(Ajustar si las carpetas están dentro de `src/`.)
 
-## Estructura de carpetas
+## Seguridad y multi-comercio
+- Todo recurso se filtra por `req.user.businessId`. El middleware de autenticación revalida en cada request que el usuario esté activo y con contraseña, y que el comercio esté activo.
+- Roles: `admin`, `editor`, `operador`.
+- El **superadmin** usa un login y un token aparte (`/api/platform/*`). Ve metadatos de cuentas, nunca contenido de los comercios ni contraseñas.
+- Los usuarios no se registran solos: se crean por **invitación** (link de un solo uso, vence a los 7 días; en base solo se guarda el hash del token). Reinvitar también sirve para recuperar contraseña.
+- La activación exige aceptar los términos y registra versión, fecha e IP de la aceptación.
+- Protecciones: `helmet`, límites de intentos en login y activación, lista de orígenes CORS, validaciones numéricas y de pertenencia entre comercios.
+- Cuenta **demo** (`Business.type = 'demo'`): datos de ejemplo, se reinicia todas las noches a las 03:00 (hora de Buenos Aires), con gestión de usuarios e importación bloqueadas.
 
-src/
-├── config/ # conexión a la base de datos
-├── models/ # definiciones de Sequelize y asociaciones
-├── controllers/ # lógica de cada endpoint
-├── routes/ # mapeo de URLs a controllers
-├── middlewares/ # auth, roles, validación, manejo de errores
-├── services/ # lógica de negocio compleja (importación de archivos)
-└── utils/ # helpers reutilizables
+## Superadmin
+Crear el primer superadmin (apuntando a la base del entorno correspondiente):
+```bash
+DB_HOST=... DB_PORT=... DB_NAME=... DB_USER=... DB_PASSWORD='...' \
+PLATFORM_ADMIN_EMAIL=mail@dominio.com PLATFORM_ADMIN_PASSWORD='...' PLATFORM_ADMIN_NAME='Nombre' \
+node scripts/createPlatformAdmin.js
+```
+Para correrlo contra Railway hay que habilitar temporalmente el TCP Proxy del MySQL y **desactivarlo al terminar**.
 
+## Cambios en la base de datos
+`sequelize.sync()` solo **crea tablas nuevas**; no modifica columnas existentes. Los cambios de columnas se hacen con `ALTER TABLE` manual, **primero en staging y después en producción**, una sentencia por vez.
 
-## Scripts
+## Flujo de trabajo
+1. Trabajar en la rama `staging` y hacer push: Railway y Vercel despliegan solos en staging.
+2. Probar en la URL de staging.
+3. Si anda bien, pasar a producción:
+```bash
+git checkout main
+git pull
+git merge staging
+git push
+git checkout staging
+```
+4. Si hubo `ALTER TABLE`, correrlo en producción **antes** de hacer el merge.
 
-- `npm run dev` — levanta el servidor con recarga automática (nodemon)
-- `npm start` — levanta el servidor en modo producción
+## Backups
+Railway Pro: backups diarios (se guardan 6 días), semanales (27 días) y mensuales (89 días) del MySQL de producción. Restaurar: servicio MySQL → Backups → elegir fecha → Restore → revisar → Deploy (crea un volumen nuevo).
 
-## Notas de diseño
-
-- Cada tabla de negocio incluye `businessId`, preparando el modelo para multi-tenant sin necesitar un refactor grande más adelante. Toda query queda filtrada por el `businessId` del usuario logueado.
-- `Category` se auto-referencia (`parentId`) para resolver categorías y subcategorías con una sola tabla.
-- El `stock` de un producto es un valor cacheado que se actualiza con cada movimiento registrado en `StockMovement` — el historial completo queda auditado. Generar un remito corre dentro de una transacción de Sequelize: si algo falla, no queda stock descontado sin el remito creado.
-- Un remito calcula, en este orden: subtotal de ítems → descuento (% y/o monto fijo) → si el cliente es **Responsable Inscripto**, discrimina IVA sobre el total ya descontado → si se eligió un plan de cuotas, calcula el total financiado con el interés de ese plan.
-- Las formas de pago pueden tener uno o varios planes de cuotas (cantidad de cuotas + % de interés), cargados como una tabla relacionada (`InstallmentPlan`).
-- La importación de Excel normaliza los encabezados (sin importar mayúsculas, acentos o espacios) antes de mapear cada fila.
-
-## Pendiente / próximas etapas
-
-- Integración con ARCA (facturación electrónica)
-- Estadísticas de ventas
+## Textos legales
+La versión vigente de los términos y del aviso de privacidad está en `utils/legal.js` y debe coincidir con `LEGAL_VERSION` del frontend.
