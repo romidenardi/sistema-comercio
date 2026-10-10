@@ -23,8 +23,6 @@ export const authMiddleware = async (req, res, next) => {
   }
 
   try {
-    // Se revalida contra la base en cada pedido: usuario activo, con contraseña
-    // vigente, comercio activo y rol actual (no el que quedó en el token)
     const user = await User.findOne({
       where: {
         id: decoded.id,
@@ -33,14 +31,19 @@ export const authMiddleware = async (req, res, next) => {
         passwordHash: { [Op.ne]: null },
       },
       attributes: ['id', 'businessId', 'role'],
-      include: [{ model: Business, attributes: ['status'] }],
+      include: [{ model: Business, attributes: ['status', 'type'] }],
     });
 
     if (!user || user.Business.status !== 'active') {
       return res.status(401).json({ message: 'Sesión inválida' });
     }
 
-    req.user = { id: user.id, businessId: user.businessId, role: user.role };
+    req.user = {
+      id: user.id,
+      businessId: user.businessId,
+      role: user.role,
+      businessType: user.Business.type,
+    };
     next();
   } catch (error) {
     next(error);

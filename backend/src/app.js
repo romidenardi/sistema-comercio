@@ -16,6 +16,7 @@ import importRoutes from './routes/import.routes.js';
 import userRoutes from './routes/user.routes.js';
 import { authMiddleware } from './middlewares/auth.middleware.js';
 import { requireRole } from './middlewares/role.middleware.js';
+import { forbidInDemo } from './middlewares/demo.middleware.js';
 import { errorMiddleware } from './middlewares/error.middleware.js';
 
 const app = express();
@@ -51,8 +52,8 @@ app.use('/api/customers', authMiddleware, customerRoutes);
 app.use('/api/suppliers', authMiddleware, supplierRoutes);
 app.use('/api/purchases', authMiddleware, purchaseRoutes);
 app.use('/api/orders', authMiddleware, orderRoutes);
-app.use('/api/imports', authMiddleware, importRoutes);
-app.use('/api/users', authMiddleware, requireRole('admin'), userRoutes);
+app.use('/api/imports', authMiddleware, forbidInDemo, importRoutes);
+app.use('/api/users', authMiddleware, forbidInDemo, requireRole('admin'), userRoutes);
 
 app.use(errorMiddleware);
 

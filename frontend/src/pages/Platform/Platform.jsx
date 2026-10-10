@@ -7,6 +7,7 @@ import {
   createBusiness,
   setBusinessStatus,
   reinviteBusinessAdmin,
+  resetDemoBusiness,
 } from '../../api/platform.api';
 
 const EMPTY_FORM = { name: '', adminName: '', adminEmail: '', type: 'client', trialDays: '' };
@@ -76,6 +77,9 @@ export default function Platform() {
       });
       setCopied(false);
       setForm(EMPTY_FORM);
+      if (data.demoSeeded === false) {
+        setError('El comercio se creó, pero fallaron los datos de ejemplo. Usá "Reiniciar demo" para cargarlos.');
+      }
       await load();
     } catch (err) {
       setError(errorMessage(err));
@@ -119,6 +123,20 @@ export default function Platform() {
       });
       setCopied(false);
       await load();
+    } catch (err) {
+      setError(errorMessage(err));
+    }
+  };
+
+  const handleResetDemo = async (business) => {
+    const message =
+      `Se borrarán todos los datos de "${business.name}" y se cargarán los datos de ejemplo. ¿Continuar?`;
+    if (!window.confirm(message)) return;
+
+    setError('');
+    try {
+      await resetDemoBusiness(business.id);
+      window.alert('Demo reiniciada con datos de ejemplo.');
     } catch (err) {
       setError(errorMessage(err));
     }
@@ -266,6 +284,11 @@ export default function Platform() {
                           {admin && (
                             <button type="button" onClick={() => handleReinvite(business)}>
                               Link nuevo
+                            </button>
+                          )}
+                          {business.type === 'demo' && (
+                            <button type="button" onClick={() => handleResetDemo(business)}>
+                              Reiniciar demo
                             </button>
                           )}
                         </div>

@@ -41,3 +41,4 @@ export const setBusinessStatus = (id, status) =>
   platformApi.patch(`/platform/businesses/${id}/status`, { status });
 export const reinviteBusinessAdmin = (id, userId) =>
   platformApi.post(`/platform/businesses/${id}/reinvite`, userId ? { userId } : {});
+export const resetDemoBusiness = (id) => platformApi.post(`/platform/businesses/${id}/reset-demo`);
