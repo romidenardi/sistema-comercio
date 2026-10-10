@@ -16,7 +16,7 @@ export const login = asyncHandler(async (req, res) => {
 
   const user = await User.findOne({
     where: { email },
-    include: [{ model: Business, attributes: ['id', 'status'] }],
+    include: [{ model: Business, attributes: ['id', 'status', 'type'] }],
   });
 
   const valid =
@@ -37,7 +37,13 @@ export const login = asyncHandler(async (req, res) => {
 
   res.json({
     token,
-    user: { id: user.id, name: user.name, email: user.email, role: user.role },
+    user: {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      businessType: user.Business.type,
+    },
   });
 });
 

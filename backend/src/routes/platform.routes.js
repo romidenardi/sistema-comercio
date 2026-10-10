@@ -5,6 +5,7 @@ import {
   createBusiness,
   setBusinessStatus,
   reinviteUser,
+  resetDemo,
 } from '../controllers/platform.controller.js';
 import { platformAuthMiddleware } from '../middlewares/platformAuth.middleware.js';
 
@@ -17,5 +18,6 @@ router.get('/businesses', listBusinesses);
 router.post('/businesses', createBusiness);
 router.patch('/businesses/:id/status', setBusinessStatus);
 router.post('/businesses/:id/reinvite', reinviteUser);
+router.post('/businesses/:id/reset-demo', resetDemo);
 
 export default router;

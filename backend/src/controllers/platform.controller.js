@@ -4,6 +4,7 @@ import { Business, User, PlatformAdmin, sequelize } from '../models/index.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { httpError } from '../utils/httpError.js';
 import { generateInviteToken, INVITE_TTL_MS } from '../utils/inviteToken.js';
+import { resetDemoBusiness } from '../services/demo.service.js';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -107,11 +108,25 @@ export const createBusiness = asyncHandler(async (req, res) => {
     throw error;
   }
 
+  // Una demo nace con sus datos de ejemplo. Si eso fallara, el link igual se
+  // devuelve (se muestra una sola vez) y se avisa para usar "Reiniciar demo".
+  let demoSeeded = null;
+  if (type === 'demo') {
+    try {
+      await resetDemoBusiness(business.id);
+      demoSeeded = true;
+    } catch (error) {
+      console.error('[demo] No se pudieron cargar los datos de ejemplo:', error);
+      demoSeeded = false;
+    }
+  }
+
   // El link se muestra una única vez; en la base solo queda su hash
   res.status(201).json({
     business: { id: business.id, name: business.name, type: business.type, status: business.status },
     inviteUrl: buildInviteUrl(token),
     inviteExpiresAt,
+    demoSeeded,
   });
 });
 
@@ -147,4 +162,9 @@ export const reinviteUser = asyncHandler(async (req, res) => {
     inviteUrl: buildInviteUrl(token),
     inviteExpiresAt,
   });
+});
+
+export const resetDemo = asyncHandler(async (req, res) => {
+  await resetDemoBusiness(req.params.id);
+  res.json({ message: 'Demo reiniciada' });
 });
