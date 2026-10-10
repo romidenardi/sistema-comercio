@@ -1,77 +1,61 @@
-# Sistema de stock y clientes — Frontend
+# Talarix: Frontend
 
-Interfaz web para administrar stock, clientes, productos, compras, remitos y formas de pago de pequeños comercios. Consume la API del backend de este mismo sistema.
+Interfaz web del sistema de gestión para pequeños comercios.
 
-## Stack
+**Stack:** React, Vite, React Router. Desplegado en Vercel.
 
-- React + Vite
-- React Router v6 (rutas protegidas por rol)
-- react-hook-form (formularios y listas dinámicas)
-- Axios (con interceptor de sesión vencida)
-- CSS propio, responsive (sin librería de componentes)
-
-## Requisitos previos
-
-- Node.js 18 o superior
-- El backend de este sistema corriendo (local o deployado)
-
-## Instalación
-
+## Puesta en marcha local
 ```bash
-cd frontend
 npm install
+npm run dev      # http://localhost:5173
+npm run build    # genera dist/ (no se versiona)
 ```
 
 ## Variables de entorno
+| Variable | Descripción |
+|---|---|
+| `VITE_API_URL` | URL base del backend, incluyendo `/api` (ej. `https://api.ejemplo.com/api`) |
 
-Copiá `.env.example` a `.env` (o creá el archivo) y completá:
+Las variables de Vite se incorporan **al construir**: si cambian en Vercel, hay que redesplegar.
 
-```dotenv
-VITE_API_URL=http://localhost:3000/api
+En Vercel hay una variable por entorno: una para **Production** y otra para **Preview** limitada a la rama `staging`.
+
+## Rutas
+| Ruta | Acceso |
+|---|---|
+| `/login` | pública |
+| `/activar?token=...` | pública (activación de cuenta con aceptación de términos) |
+| `/terminos`, `/privacidad` | públicas |
+| `/plataforma/login`, `/plataforma` | superadmin (token aparte, guardado en `sessionStorage`) |
+| `/orders`, `/purchases` | usuarios autenticados |
+| `/categories`, `/payments`, `/customers`, `/products`, `/suppliers`, `/imports` | `admin` y `editor` |
+| `/users` | `admin` |
+
+Las rutas están en `src/routes/AppRoutes.jsx`.
+
+## Estructura
 ```
-
-En producción (Vercel), esta variable apunta a la URL del backend deployado en Railway.
-
-## Cómo levantar el proyecto
-
-```bash
-npm run dev
-```
-
-Por defecto corre en `http://localhost:5173`.
-
-## Scripts
-
-- `npm run dev` — levanta el servidor de desarrollo con recarga automática
-- `npm run build` — genera el build de producción en `dist/`
-- `npm run preview` — sirve el build de producción localmente para probarlo
-
-## Autenticación y roles
-
-- El login guarda `token` y `user` (incluye el rol) en `localStorage`.
-- Si el token vence o es inválido, un interceptor de Axios desloguea automáticamente y redirige a `/login`.
-- El menú lateral y las rutas se filtran según el rol (`admin`, `editor`, `operador`) — ver `routes/PrivateRoute.jsx` y `components/layout/Layout.jsx`. Esto es solo comodidad visual: la seguridad real está en el backend.
-
-## Estructura de carpetas
-
 src/
-├── api/ # funciones que llaman a cada endpoint (axios)
-├── components/
-│ ├── common/ # Spinner, StockMovementPanel, etc.
-│ └── layout/ # Layout.jsx (sidebar + outlet)
-├── context/ # AuthContext, ToastContext
-├── hooks/ # useResource (CRUD genérico)
-├── pages/ # una carpeta por sección (Products, Orders, Payments, etc.)
-├── routes/ # AppRoutes.jsx, PrivateRoute.jsx
-└── index.css # estilos globales, incluido el responsive
+  api/          clientes HTTP (axios) y llamadas por recurso
+  context/      AuthContext (sesión, rol, modo demo)
+  components/   layout y componentes compartidos
+  pages/        una carpeta por pantalla
+  legal/        textos de términos y privacidad (legalContent.js)
+  routes/       definición de rutas y rutas privadas
+```
 
+## Cuenta demo
+Si el comercio es de tipo demo, el menú oculta Importar y Usuarios y se muestra un aviso de que no deben cargarse datos reales.
 
-## Notas de diseño
+## Textos legales
+Se editan en `src/legal/legalContent.js`. Al cambiarlos:
+1. Subir `LEGAL_VERSION`.
+2. Subir también la misma versión en `backend/utils/legal.js`. Si no coinciden, la activación de cuentas falla a propósito.
+3. Poner `LEGAL_IS_DRAFT = false` cuando estén validados.
 
-- `useResource` encapsula el ciclo get/create/update/remove para no repetir ese código en cada pantalla de CRUD.
-- Las tablas se convierten en "tarjetas" apiladas en mobile (`@media max-width: 640px`) usando el atributo `data-label` en cada celda.
-- El remito (`Orders.jsx`) recalcula en vivo, a medida que se completa el formulario, el mismo cálculo que hace el backend al confirmar: subtotal, descuento, IVA discriminado (si corresponde) y cuotas — así el usuario ve el total antes de generar el remito, no después.
+## Despliegue
+- Rama `staging` → vista previa de Vercel (URL fija de la rama).
+- Rama `main` → producción.
+- `vercel.json` redirige todas las rutas a `index.html` (SPA).
 
-## Deploy
-
-Deployado en Vercel, conectado al repo — cada push a la rama principal dispara un build automático.
+Flujo de trabajo: ver el README del backend.
