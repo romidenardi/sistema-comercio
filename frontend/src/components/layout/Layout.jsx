@@ -8,7 +8,7 @@ const ROLE_LABELS = {
 };
 
 const Layout = () => {
-  const { logout, role, user } = useAuth();
+  const { logout, role, user, isDemo } = useAuth();
 
   const handleLogout = () => {
     if (confirm('¿Cerrar sesión?')) {
@@ -40,12 +40,18 @@ const Layout = () => {
           <NavLink to="/orders">Remitos</NavLink>
           {canManageData && <NavLink to="/suppliers">Proveedores</NavLink>}
           <NavLink to="/purchases">Compras</NavLink>
-          {canManageData && <NavLink to="/imports">Importar</NavLink>}
-          {isAdmin && <NavLink to="/users">Usuarios</NavLink>}
+          {canManageData && !isDemo && <NavLink to="/imports">Importar</NavLink>}
+          {isAdmin && !isDemo && <NavLink to="/users">Usuarios</NavLink>}
         </nav>
         <button className="sidebar-logout" onClick={handleLogout}>Cerrar sesión</button>
       </aside>
       <main className="app-main">
+        {isDemo && (
+          <div className="demo-banner" role="status">
+            <strong>Cuenta de demostración.</strong> No cargues datos reales: los pueden ver otros
+            visitantes y todo se reinicia cada noche.
+          </div>
+        )}
         <Outlet />
       </main>
     </div>

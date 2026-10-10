@@ -806,3 +806,12 @@ td:nth-child(1),
 .platform-badge-off { background: #fde7e9; color: #9b1c2c; }
 .invite-box { border: 1px solid #f0c27a; background: #fff4e5; color: #7a4a00; border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
 .invite-box input { width: 100%; }
+
+.demo-banner {
+  background: #fff4e5;
+  border: 1px solid #f0c27a;
+  color: #7a4a00;
+  padding: 10px 14px;
+  border-radius: 6px;
+  margin-bottom: 16px;
+}
