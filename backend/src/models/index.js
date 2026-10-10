@@ -12,6 +12,7 @@ import Purchase from './purchase.model.js';
 import PurchaseItem from './purchaseItem.model.js';
 import Order from './order.model.js';
 import OrderItem from './orderItem.model.js';
+import PlatformAdmin from './platformAdmin.model.js'; 
 
 Business.hasMany(Category, { foreignKey: 'businessId' });
 Category.belongsTo(Business, { foreignKey: 'businessId' });
@@ -75,5 +76,5 @@ OrderItem.belongsTo(Product, { foreignKey: 'productId' });
 
 export {
   sequelize, Business, Category, Product, StockMovement, Payment, InstallmentPlan,
-  User, Customer, Supplier, Purchase, PurchaseItem, Order, OrderItem,
+  User, Customer, Supplier, Purchase, PurchaseItem, Order, OrderItem, PlatformAdmin,
 };

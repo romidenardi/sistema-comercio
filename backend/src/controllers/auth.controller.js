@@ -1,77 +1,65 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { User } from '../models/index.js';
+import { User, Business } from '../models/index.js';
+import { asyncHandler } from '../utils/asyncHandler.js';
+import { httpError } from '../utils/httpError.js';
+import { hashToken } from '../utils/inviteToken.js';
 
-export const register = async (req, res) => {
-  try {
-    const { name, email, password } = req.body;
+const MIN_PASSWORD_LENGTH = 8;
+const MAX_PASSWORD_LENGTH = 72; // límite de bcrypt
 
-    if (!name || !email || !password) {
-      return res.status(400).json({ message: 'Nombre, email y contraseña son obligatorios' });
-    }
+export const login = asyncHandler(async (req, res) => {
+  const email = String(req.body.email || '').trim().toLowerCase();
+  const password = String(req.body.password || '');
 
-    const existing = await User.findOne({ where: { email } });
-    if (existing) {
-      return res.status(400).json({ message: 'Ya existe un usuario con ese email' });
-    }
+  if (!email || !password) throw httpError('Email y contraseña son obligatorios');
 
-    const usersInBusiness = await User.count({
-      where: { businessId: process.env.BUSINESS_ID_DEFAULT },
-    });
+  const user = await User.findOne({
+    where: { email },
+    include: [{ model: Business, attributes: ['id', 'status'] }],
+  });
 
-    if (usersInBusiness > 0) {
-      return res.status(403).json({
-        message: 'Ya existe un administrador para este comercio. Pedile que te cree el usuario desde la pantalla de Usuarios.',
-      });
-    }
+  const valid =
+    user && user.active && user.passwordHash && (await bcrypt.compare(password, user.passwordHash));
+  if (!valid) throw httpError('Credenciales inválidas', 401);
 
-    const passwordHash = await bcrypt.hash(password, 10);
-
-    // El primer usuario de un comercio siempre se crea como admin
-    const user = await User.create({
-      name,
-      email,
-      passwordHash,
-      role: 'admin',
-      businessId: process.env.BUSINESS_ID_DEFAULT,
-    });
-
-    const { passwordHash: _, ...userSafe } = user.toJSON();
-    res.status(201).json(userSafe);
-  } catch (error) {
-    res.status(400).json({ message: 'Error al crear el usuario', error: error.message });
+  if (user.Business.status !== 'active') {
+    throw httpError('El acceso de este comercio está suspendido. Contactanos para reactivarlo.', 403);
   }
-};
 
-export const login = async (req, res) => {
-  try {
-    const { email, password } = req.body;
+  await user.update({ lastLoginAt: new Date() });
 
-    if (!email || !password) {
-      return res.status(400).json({ message: 'Email y contraseña son obligatorios' });
-    }
+  const token = jwt.sign(
+    { id: user.id, businessId: user.businessId, role: user.role },
+    process.env.JWT_SECRET,
+    { expiresIn: '8h' }
+  );
 
-    const user = await User.findOne({ where: { email } });
-    if (!user || !user.active) {
-      return res.status(401).json({ message: 'Credenciales inválidas' });
-    }
+  res.json({
+    token,
+    user: { id: user.id, name: user.name, email: user.email, role: user.role },
+  });
+});
 
-    const passwordMatches = await bcrypt.compare(password, user.passwordHash);
-    if (!passwordMatches) {
-      return res.status(401).json({ message: 'Credenciales inválidas' });
-    }
+// El cliente elige su contraseña con el link que le mandó el superadmin
+export const activateAccount = asyncHandler(async (req, res) => {
+  const token = String(req.body.token || '');
+  const password = String(req.body.password || '');
 
-    const token = jwt.sign(
-      { id: user.id, businessId: user.businessId, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: '8h' }
-    );
-
-    res.json({
-      token,
-      user: { id: user.id, name: user.name, email: user.email, role: user.role },
-    });
-  } catch (error) {
-    res.status(500).json({ message: 'Error al iniciar sesión', error: error.message });
+  if (!token) throw httpError('Link de activación inválido');
+  if (password.length < MIN_PASSWORD_LENGTH || password.length > MAX_PASSWORD_LENGTH) {
+    throw httpError(`La contraseña debe tener entre ${MIN_PASSWORD_LENGTH} y ${MAX_PASSWORD_LENGTH} caracteres`);
   }
-};
+
+  const user = await User.findOne({ where: { inviteTokenHash: hashToken(token) } });
+  if (!user || !user.inviteExpiresAt || user.inviteExpiresAt < new Date()) {
+    throw httpError('El link de activación es inválido o venció. Pedí uno nuevo.');
+  }
+
+  user.passwordHash = await bcrypt.hash(password, 10);
+  user.inviteTokenHash = null;
+  user.inviteExpiresAt = null;
+  await user.save();
+
+  res.json({ message: 'Contraseña creada. Ya podés iniciar sesión.' });
+});

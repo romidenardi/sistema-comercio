@@ -3,19 +3,21 @@ const { DataTypes } = pkg;
 import sequelize from '../config/database.js';
 
 const Business = sequelize.define('Business', {
-  id: {
-    type: DataTypes.UUID,
-    defaultValue: DataTypes.UUIDV4,
-    primaryKey: true,
-  },
-  name: {
-    type: DataTypes.STRING,
+  id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
+  name: { type: DataTypes.STRING, allowNull: false },
+  cuit: { type: DataTypes.STRING, allowNull: true },
+  status: {
+    type: DataTypes.ENUM('active', 'suspended'),
     allowNull: false,
+    defaultValue: 'active',
   },
-  cuit: {
-    type: DataTypes.STRING,
+  type: {
+    type: DataTypes.ENUM('demo', 'client'),
     allowNull: false,
+    defaultValue: 'client',
   },
+  trialEndsAt: { type: DataTypes.DATE, allowNull: true, field: 'trial_ends_at' },
+  contactEmail: { type: DataTypes.STRING, allowNull: true, field: 'contact_email' },
 }, {
   tableName: 'businesses',
 });

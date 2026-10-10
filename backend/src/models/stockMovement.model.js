@@ -8,6 +8,11 @@ const StockMovement = sequelize.define('StockMovement', {
     defaultValue: DataTypes.UUIDV4,
     primaryKey: true,
   },
+    businessId: {
+    type: DataTypes.UUID,
+    allowNull: false,
+    field: 'business_id',
+  },
   productId: {
     type: DataTypes.UUID,
     allowNull: false,

@@ -23,6 +23,11 @@ const InstallmentPlan = sequelize.define('InstallmentPlan', {
     defaultValue: 0,
     field: 'interest_rate', // porcentaje de interés, ej: 15.5
   },
+    active: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: true,
+  },
 }, {
   tableName: 'installment_plans',
 });

@@ -103,9 +103,9 @@ const Users = () => {
             id="password"
             type="password"
             placeholder="Mínimo 6 caracteres"
-            {...register('password', { required: 'La contraseña es obligatoria', minLength: 6 })}
+            {...register('password', { required: 'La contraseña es obligatoria', minLength: 8 })}
           />
-          {errors.password && <span className="error">La contraseña debe tener al menos 6 caracteres</span>}
+          {errors.password && <span className="error">La contraseña debe tener al menos 8 caracteres</span>}
         </div>
 
         <div className="field field-full">
@@ -153,7 +153,7 @@ const Users = () => {
                             id={`edit-password-${user.id}`}
                             type="password"
                             placeholder="Dejar vacío para no cambiarla"
-                            {...editForm.register('password', { minLength: 6 })}
+                            {...editForm.register('password', { minLength: 8 })}
                           />
                         </div>
                         <div className="field">
