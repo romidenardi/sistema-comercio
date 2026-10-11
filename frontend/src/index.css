@@ -1428,3 +1428,8 @@ button.report-export:disabled {
   border-radius: var(--radius);
   overflow: hidden;
 }
+
+.field-hint {
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
