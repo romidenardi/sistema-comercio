@@ -10,7 +10,6 @@ const { Op } = pkg;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const daysAgoDate = (days) => new Date(Date.now() - days * DAY_MS);
 
-// ---------- Borrado (hijos antes que padres) ----------
 const wipeBusinessData = async (businessId, t) => {
   const idsOf = async (Model) =>
     (await Model.findAll({ where: { businessId }, attributes: ['id'], raw: true, transaction: t }))
@@ -249,7 +248,6 @@ const seedDemoData = async (businessId, t) => {
   });
 };
 
-// ---------- API del servicio ----------
 const resetting = new Set();
 
 export const resetDemoBusiness = async (businessId) => {

@@ -23,7 +23,7 @@ export const updateCategory = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const category = await Category.findOne({ where: { id, businessId: req.user.businessId } });
   if (!category) {
-    const error = new Error('Category not found');
+    const error = new Error('Categoría no encontrada');
     error.status = 404;
     throw error;
   }
@@ -35,7 +35,7 @@ export const deleteCategory = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const category = await Category.findOne({ where: { id, businessId: req.user.businessId } });
   if (!category) {
-    const error = new Error('Category not found');
+    const error = new Error('Categoría no encontrada');
     error.status = 404;
     throw error;
   }

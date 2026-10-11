@@ -64,7 +64,7 @@ const Users = () => {
   };
 
   const onDelete = (id) => {
-    if (confirm('¿Eliminar este usuario? No va a poder volver a iniciar sesión.')) remove(id);
+    if (confirm('¿Eliminar este usuario? La acción no se puede deshacer.')) remove(id);
   };
 
   const roleLabel = (role) => ROLES.find((r) => r.value === role)?.label.split(' (')[0] || role;

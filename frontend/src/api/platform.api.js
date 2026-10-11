@@ -13,7 +13,6 @@ export const clearPlatformToken = () => {
   try { sessionStorage.removeItem(TOKEN_KEY); } catch { /* sin storage */ }
 };
 
-// Instancia aparte: reutiliza la URL base del sistema pero con su propio token
 const platformApi = axios.create({ baseURL: api.defaults.baseURL });
 
 platformApi.interceptors.request.use((config) => {

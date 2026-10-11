@@ -108,8 +108,6 @@ export const createBusiness = asyncHandler(async (req, res) => {
     throw error;
   }
 
-  // Una demo nace con sus datos de ejemplo. Si eso fallara, el link igual se
-  // devuelve (se muestra una sola vez) y se avisa para usar "Reiniciar demo".
   let demoSeeded = null;
   if (type === 'demo') {
     try {
@@ -121,7 +119,6 @@ export const createBusiness = asyncHandler(async (req, res) => {
     }
   }
 
-  // El link se muestra una única vez; en la base solo queda su hash
   res.status(201).json({
     business: { id: business.id, name: business.name, type: business.type, status: business.status },
     inviteUrl: buildInviteUrl(token),
@@ -141,7 +138,6 @@ export const setBusinessStatus = asyncHandler(async (req, res) => {
   res.json({ id: business.id, name: business.name, status: business.status });
 });
 
-// Cubre "olvidé mi contraseña": invalida la clave actual y genera un link nuevo
 export const reinviteUser = asyncHandler(async (req, res) => {
   const business = await Business.findByPk(req.params.id);
   if (!business) throw httpError('Comercio no encontrado', 404);

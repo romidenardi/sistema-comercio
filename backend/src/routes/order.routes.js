@@ -9,7 +9,7 @@ const router = Router();
 const createRules = [
   body('customerId').notEmpty().withMessage('El cliente es obligatorio'),
   body('paymentId').notEmpty().withMessage('La forma de pago es obligatoria'),
-  body('items').isArray({ min: 1 }).withMessage('Debe incluir al menos un artículo'),
+  body('items').isArray({ min: 1 }).withMessage('Debés incluir al menos un artículo'),
 ];
 
 router.get('/', getOrders);

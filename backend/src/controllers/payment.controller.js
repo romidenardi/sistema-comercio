@@ -112,7 +112,7 @@ export const deletePayment = asyncHandler(async (req, res) => {
 
   const usedInOrders = await Order.count({ where: { paymentId: id, businessId } });
   if (usedInOrders > 0) {
-    throw httpError('Esta forma de pago ya se usó en remitos y no se puede eliminar.', 409);
+    throw httpError('Esta forma de pago se usó en remitos ya creados y no se puede eliminar.', 409);
   }
 
   await InstallmentPlan.destroy({ where: { paymentId: id } });

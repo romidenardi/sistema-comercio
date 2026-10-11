@@ -28,7 +28,7 @@ export const getOrder = asyncHandler(async (req, res) => {
     where: { id: req.params.id, businessId: req.user.businessId },
     include: orderIncludes,
   });
-  if (!order) throw httpError('Order not found', 404);
+  if (!order) throw httpError('Remito no encontrado', 404);
   res.json(order);
 });
 
@@ -81,7 +81,6 @@ export const createOrder = asyncHandler(async (req, res) => {
       if (!installmentPlan) throw httpError('Plan de cuotas no encontrado', 404);
     }
 
-    // ---- Agrupar por producto: un solo registro por producto, aunque se repita en filas ----
     const requested = new Map();
     const addStockFor = new Set();
     for (const row of rows) {
@@ -113,7 +112,6 @@ export const createOrder = asyncHandler(async (req, res) => {
       stockPlan.set(productId, { product, qty, shortfall });
     }
 
-    // ---- Totales, IVA y descuentos ----
     const discriminatesVat = FISCAL_CONDITIONS_WITH_VAT_BREAKDOWN.includes(customer.fiscalCondition);
 
     let grossSubtotal = 0;
@@ -139,7 +137,6 @@ export const createOrder = asyncHandler(async (req, res) => {
     const subtotal = discriminatesVat ? round2(grossSubtotal * scale) : null;
     const vatAmount = discriminatesVat ? round2(grossVat * scale) : null;
 
-    // ---- Cuotas ----
     let installmentsCount = null;
     let interestRate = null;
     let installmentAmount = null;
@@ -151,7 +148,6 @@ export const createOrder = asyncHandler(async (req, res) => {
       installmentAmount = round2(totalFinanced / installmentsCount);
     }
 
-    // ---- Persistencia ----
     const order = await Order.create({
       customerId: customer.id,
       paymentId: payment.id,

@@ -10,7 +10,7 @@ export const getProductByBarcode = asyncHandler(async (req, res) => {
   const { barcode } = req.params;
   const product = await Product.findOne({ where: { barcode, businessId: req.user.businessId } });
   if (!product) {
-    const error = new Error('Product not found');
+    const error = new Error('Producto no encontrado');
     error.status = 404;
     throw error;
   }
@@ -29,7 +29,7 @@ export const updateProduct = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const product = await Product.findOne({ where: { id, businessId: req.user.businessId } });
   if (!product) {
-    const error = new Error('Product not found');
+    const error = new Error('Producto no encontrado');
     error.status = 404;
     throw error;
   }
@@ -41,7 +41,7 @@ export const deleteProduct = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const product = await Product.findOne({ where: { id, businessId: req.user.businessId } });
   if (!product) {
-    const error = new Error('Product not found');
+    const error = new Error('Producto no encontrado');
     error.status = 404;
     throw error;
   }

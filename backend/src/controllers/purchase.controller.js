@@ -49,7 +49,6 @@ export const createPurchase = asyncHandler(async (req, res) => {
     const supplier = await Supplier.findOne({ where: { id: supplierId, businessId }, transaction: t });
     if (!supplier) throw httpError('Proveedor no encontrado', 404);
 
-    // Un solo registro por producto, aunque se repita en varias filas
     const byProduct = new Map();
     let total = 0;
     for (const row of rows) {
@@ -65,7 +64,7 @@ export const createPurchase = asyncHandler(async (req, res) => {
         byProduct.set(row.productId, entry);
       }
       entry.quantity += row.quantity;
-      entry.lastCost = row.unitCost; // el costo del producto queda con el de la última fila
+      entry.lastCost = row.unitCost;
       total += row.quantity * row.unitCost;
     }
 

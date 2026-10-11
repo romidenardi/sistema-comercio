@@ -36,11 +36,11 @@ export const importProducts = asyncHandler(async (req, res) => {
 
   const results = await processImport(rows, {
     mapRow: (row) => ({
-      internalCode: String(getField(row, 'Codigo Interno')).trim(),
+      internalCode: String(getField(row, 'Código Interno')).trim(),
       barcode: String(getField(row, 'Codigo de Barras')).trim() || null,
       name: String(getField(row, 'Nombre')).trim(),
       brand: String(getField(row, 'Marca')).trim() || null,
-      categoryName: String(getField(row, 'Categoria')).trim(),
+      categoryName: String(getField(row, 'Categoría')).trim(),
       price: Number(getField(row, 'Precio') || 0),
       cost: Number(getField(row, 'Costo') || 0),
       unitType: (String(getField(row, 'Unidad') || 'unidad').trim().toLowerCase() === 'peso') ? 'weight' : 'unit',
@@ -82,18 +82,18 @@ export const importCustomers = asyncHandler(async (req, res) => {
 
   const results = await processImport(rows, {
     mapRow: (row) => ({
-      businessName: String(getField(row, 'Razon Social')).trim() || null,
+      businessName: String(getField(row, 'Razón Social')).trim() || null,
       firstName: String(getField(row, 'Nombre')).trim() || null,
       lastName: String(getField(row, 'Apellido')).trim() || null,
-      fiscalCondition: String(getField(row, 'Condicion Fiscal')).trim(),
+      fiscalCondition: String(getField(row, 'Condición Fiscal')).trim(),
       cuit: String(getField(row, 'CUIT')).trim() || null,
       city: String(getField(row, 'Localidad')).trim() || null,
       province: String(getField(row, 'Provincia')).trim() || null,
-      phone: String(getField(row, 'Telefono')).trim() || null,
+      phone: String(getField(row, 'Teléfono')).trim() || null,
       email: String(getField(row, 'Email')).trim() || null,
     }),
     validateRow: (data) => {
-      if (!data.businessName && !data.firstName) return 'Falta razón social o nombre';
+      if (!data.businessName && !data.firstName) return 'Falta la razón social o el nombre';
       if (!data.fiscalCondition) return 'Falta la condición fiscal';
       return null;
     },
@@ -119,7 +119,7 @@ export const importSuppliers = asyncHandler(async (req, res) => {
       name: String(getField(row, 'Nombre')).trim(),
       cuit: String(getField(row, 'CUIT')).trim() || null,
       contactPerson: String(getField(row, 'Contacto')).trim() || null,
-      phone: String(getField(row, 'Telefono')).trim() || null,
+      phone: String(getField(row, 'Teléfono')).trim() || null,
       email: String(getField(row, 'Email')).trim() || null,
       city: String(getField(row, 'Localidad')).trim() || null,
       province: String(getField(row, 'Provincia')).trim() || null,

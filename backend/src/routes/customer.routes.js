@@ -15,7 +15,7 @@ const createRules = [
   body('fiscalCondition').notEmpty().withMessage('La condición fiscal es obligatoria'),
   body().custom((_, { req }) => {
     if (!req.body.businessName && !req.body.firstName) {
-      throw new Error('Debe completar razón social o nombre y apellido');
+      throw new Error('Debés completar razón social o nombre y apellido');
     }
     return true;
   }),

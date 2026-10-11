@@ -1,5 +1,6 @@
 import { Outlet, NavLink } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
+import logo from '../../assets/logo.png';
 
 const ROLE_LABELS = {
   admin: 'Administrador',
@@ -22,7 +23,9 @@ const Layout = () => {
   return (
     <div className="app-layout">
       <aside className="sidebar">
-        <div className="sidebar-brand">Talarix</div>
+        <div className="sidebar-brand">
+          <img src={logo} alt="Talarix" className="sidebar-logo" />
+        </div>
 
         {user && (
           <div className="sidebar-user">

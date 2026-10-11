@@ -35,7 +35,7 @@ const Order = sequelize.define('Order', {
   },
   grossTotal: {
     type: DataTypes.DECIMAL(12, 2),
-    allowNull: true, // suma de los ítems antes de aplicar descuentos
+    allowNull: true, 
     field: 'gross_total',
   },
   discountPercent: {
@@ -48,16 +48,16 @@ const Order = sequelize.define('Order', {
     type: DataTypes.DECIMAL(12, 2),
     allowNull: false,
     defaultValue: 0,
-    field: 'discount_amount', // descuento fijo tipo bono
+    field: 'discount_amount', 
   },
   total: {
     type: DataTypes.DECIMAL(12, 2),
     allowNull: false,
-    defaultValue: 0, // total final, ya con descuentos aplicados
+    defaultValue: 0,
   },
   subtotal: {
     type: DataTypes.DECIMAL(12, 2),
-    allowNull: true, // solo tiene valor cuando discriminatesVat es true
+    allowNull: true, 
   },
   vatAmount: {
     type: DataTypes.DECIMAL(12, 2),
@@ -94,7 +94,7 @@ const Order = sequelize.define('Order', {
     type: DataTypes.STRING,
     allowNull: true,
   },
-  // 'active' o 'cancelled'. Los remitos anulados no cuentan en los reportes.
+
   status: {
     type: DataTypes.STRING(20),
     allowNull: false,

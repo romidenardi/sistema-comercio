@@ -100,7 +100,7 @@ export default function Home() {
       {canSeeReports ? (
         <Dashboard />
       ) : (
-        <p>Desde acá podés cargar remitos y compras. <Link to="/orders">Ir a Remitos</Link></p>
+        <p>Desde acá podés cargar remitos. <Link to="/orders">Ir a Remitos</Link></p>
       )}
     </div>
   );
