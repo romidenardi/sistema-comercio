@@ -1,10 +1,41 @@
+const FIELD_LABELS = {
+  internalCode: 'código interno',
+  barcode: 'código de barras',
+  name: 'nombre',
+  price: 'precio',
+  cost: 'costo',
+  vatRate: 'alícuota de IVA',
+  email: 'email',
+  businessName: 'razón social',
+  firstName: 'nombre',
+  cuit: 'CUIT',
+};
+
+const fieldLabel = (path) => FIELD_LABELS[path] || path;
+
+const duplicateMessage = (err) => {
+  const detail = `${err.original?.sqlMessage || ''} ${err.parent?.sqlMessage || ''} ${err.errors?.[0]?.path || ''}`;
+  if (detail.includes('barcode')) {
+    return 'Ese código de barras ya está asignado a otro producto';
+  }
+  return 'Ya existe un registro con esos datos';
+};
+
 export const errorMiddleware = (err, req, res, next) => {
   console.error(err);
 
-  if (err.name === 'SequelizeValidationError' || err.name === 'SequelizeUniqueConstraintError') {
+  if (err.name === 'SequelizeUniqueConstraintError') {
+    return res.status(409).json({ message: duplicateMessage(err) });
+  }
+
+  if (err.name === 'SequelizeValidationError') {
+    const details = (err.errors || []).map((e) => e.message);
+    const fields = [...new Set((err.errors || []).map((e) => e.path).filter(Boolean))].map(fieldLabel);
     return res.status(400).json({
-      message: 'Error de validación',
-      errors: err.errors.map((e) => e.message),
+      message: fields.length
+        ? `Revisá estos datos: ${fields.join(', ')}`
+        : 'Error de validación',
+      errors: details,
     });
   }
 

@@ -88,8 +88,12 @@ const Product = sequelize.define('Product', {
     allowNull: false,
     defaultValue: true,
   },
+  
 }, {
   tableName: 'products',
+  indexes: [
+    { unique: true, fields: ['business_id', 'barcode'], name: 'uq_products_business_barcode' },
+  ],
 });
 
 export default Product; 

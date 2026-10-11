@@ -1,5 +1,40 @@
+import pkg from 'sequelize';
 import { Product } from '../models/index.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
+import { httpError } from '../utils/httpError.js';
+
+const { Op } = pkg;
+
+// Vacío o solo espacios -> null; si no viene el campo -> undefined
+const cleanBarcode = (value) => {
+  if (value === undefined) return undefined;
+  const code = String(value ?? '').trim();
+  return code || null;
+};
+
+const assertBarcodeFree = async (businessId, barcode, exceptId) => {
+  if (!barcode) return;
+  const where = { businessId, barcode };
+  if (exceptId) where.id = { [Op.ne]: exceptId };
+  const existing = await Product.findOne({ where });
+  if (existing) {
+    throw httpError(`El código de barras ya está asignado a "${existing.name}"`, 409);
+  }
+};
+
+// Respaldo: si dos personas guardan a la vez, el índice único de la base lo frena
+const rethrowDuplicate = (err) => {
+  if (err?.name === 'SequelizeUniqueConstraintError') {
+    throw httpError('Ese código de barras ya está asignado a otro producto', 409);
+  }
+  throw err;
+};
+
+const findOwnProduct = async (id, businessId) => {
+  const product = await Product.findOne({ where: { id, businessId } });
+  if (!product) throw httpError('Producto no encontrado', 404);
+  return product;
+};
 
 export const getProducts = asyncHandler(async (req, res) => {
   const products = await Product.findAll({ where: { businessId: req.user.businessId } });
@@ -7,44 +42,50 @@ export const getProducts = asyncHandler(async (req, res) => {
 });
 
 export const getProductByBarcode = asyncHandler(async (req, res) => {
-  const { barcode } = req.params;
-  const product = await Product.findOne({ where: { barcode, businessId: req.user.businessId } });
-  if (!product) {
-    const error = new Error('Producto no encontrado');
-    error.status = 404;
-    throw error;
-  }
+  const barcode = cleanBarcode(req.params.barcode);
+  const product = barcode
+    ? await Product.findOne({ where: { barcode, businessId: req.user.businessId } })
+    : null;
+  if (!product) throw httpError('Producto no encontrado', 404);
   res.json(product);
 });
 
 export const createProduct = asyncHandler(async (req, res) => {
-  const product = await Product.create({
-    ...req.body,
-    businessId: req.user.businessId,
-  });
+  const { businessId } = req.user;
+  const barcode = cleanBarcode(req.body.barcode) ?? null;
+  await assertBarcodeFree(businessId, barcode);
+
+  let product;
+  try {
+    product = await Product.create({ ...req.body, barcode, businessId });
+  } catch (err) {
+    rethrowDuplicate(err);
+  }
   res.status(201).json(product);
 });
 
 export const updateProduct = asyncHandler(async (req, res) => {
-  const { id } = req.params;
-  const product = await Product.findOne({ where: { id, businessId: req.user.businessId } });
-  if (!product) {
-    const error = new Error('Producto no encontrado');
-    error.status = 404;
-    throw error;
+  const { businessId } = req.user;
+  const product = await findOwnProduct(req.params.id, businessId);
+
+  // Nunca se permite cambiar el comercio ni el id desde el pedido
+  const { businessId: _ignoredBusiness, id: _ignoredId, ...data } = req.body;
+
+  if ('barcode' in data) {
+    data.barcode = cleanBarcode(data.barcode) ?? null;
+    await assertBarcodeFree(businessId, data.barcode, product.id);
   }
-  await product.update(req.body);
+
+  try {
+    await product.update(data);
+  } catch (err) {
+    rethrowDuplicate(err);
+  }
   res.json(product);
 });
 
 export const deleteProduct = asyncHandler(async (req, res) => {
-  const { id } = req.params;
-  const product = await Product.findOne({ where: { id, businessId: req.user.businessId } });
-  if (!product) {
-    const error = new Error('Producto no encontrado');
-    error.status = 404;
-    throw error;
-  }
+  const product = await findOwnProduct(req.params.id, req.user.businessId);
   await product.destroy();
   res.status(204).send();
 });
