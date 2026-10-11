@@ -20,6 +20,7 @@ const OrderPrint = () => {
 
   const hasDiscount = Number(order.discountPercent) > 0 || Number(order.discountAmount) > 0;
   const totalDiscount = Number(order.grossTotal || 0) - Number(order.total || 0);
+  const cancelled = order.status === 'cancelled';
 
   return (
     <div className="print-page">
@@ -31,6 +32,16 @@ const OrderPrint = () => {
       </div>
 
       <div className="print-sheet">
+        {cancelled && (
+          <div className="cancelled-banner">
+            REMITO ANULADO
+            <small>
+              {order.cancelledAt && `Anulado el ${new Date(order.cancelledAt).toLocaleDateString('es-AR')}`}
+              {order.cancelReason && ` · Motivo: ${order.cancelReason}`}
+            </small>
+          </div>
+        )}
+
         <header className="print-header">
           <h1>Remito</h1>
           <p>N° {order.id.slice(0, 8).toUpperCase()}</p>

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useForm, useFieldArray } from 'react-hook-form';
-import { getOrders, createOrder } from '../../api/orders.api.js';
+import { getOrders, createOrder, cancelOrder } from '../../api/orders.api.js';
 import { getCustomers, createCustomer } from '../../api/customers.api.js';
 import { getPayments } from '../../api/payments.api.js';
 import { getProducts, createProduct } from '../../api/products.api.js';
@@ -28,6 +28,7 @@ const Orders = () => {
   const [payments, setPayments] = useState([]);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [cancellingId, setCancellingId] = useState(null);
   const { showToast } = useToast();
   const { role } = useAuth();
   const canManageData = role === 'admin' || role === 'editor';
@@ -253,6 +254,26 @@ const Orders = () => {
   const customerLabel = (c) => c.businessName || `${c.firstName} ${c.lastName || ''}`.trim();
   const displayCustomer = (order) => (order.Customer ? customerLabel(order.Customer) : '—');
 
+  const handleCancel = async (order) => {
+    const reason = window.prompt(
+      `Vas a anular el remito de ${displayCustomer(order)} por $${Number(order.total).toFixed(2)}.\n`
+      + 'El stock de los productos vendidos se devuelve y el remito deja de contar en los reportes.\n\n'
+      + 'Motivo (opcional). Aceptá para anular o cancelá para volver:',
+      ''
+    );
+    if (reason === null) return;
+
+    setCancellingId(order.id);
+    try {
+      await cancelOrder(order.id, reason);
+      showToast('Remito anulado, stock devuelto');
+      loadAll();
+    } catch (err) {
+      showToast(err.response?.data?.message || 'No se pudo anular el remito', 'error');
+    } finally {
+      setCancellingId(null);
+    }
+  };
   if (loading) return <Spinner label="Cargando remitos..." />;
 
   return (
@@ -533,19 +554,37 @@ const Orders = () => {
             </tr>
           </thead>
           <tbody>
-            {orders.map((order) => (
-              <tr key={order.id}>
-                <td data-label="Fecha">{new Date(order.date).toLocaleDateString('es-AR')}</td>
-                <td data-label="Cliente">{displayCustomer(order)}</td>
-                <td data-label="Forma de pago">{order.Payment?.name || '—'}</td>
-                <td data-label="Total">${Number(order.totalFinanced || order.total).toFixed(2)}</td>
-                <td data-label="Acciones">
-                  <Link to={`/orders/${order.id}/print`}>
-                    <button type="button">Ver / Imprimir</button>
-                  </Link>
-                </td>
-              </tr>
-            ))}
+                        {orders.map((order) => {
+              const cancelled = order.status === 'cancelled';
+              return (
+                <tr key={order.id} className={cancelled ? 'order-cancelled' : ''}>
+                  <td data-label="Fecha">{new Date(order.date).toLocaleDateString('es-AR')}</td>
+                  <td data-label="Cliente">
+                    {displayCustomer(order)}
+                    {cancelled && <span className="badge-cancelled">Anulado</span>}
+                  </td>
+                  <td data-label="Forma de pago">{order.Payment?.name || '—'}</td>
+                  <td data-label="Total">
+                    <span className="amount">${Number(order.totalFinanced || order.total).toFixed(2)}</span>
+                  </td>
+                  <td data-label="Acciones">
+                    <Link to={`/orders/${order.id}/print`}>
+                      <button type="button">Ver / Imprimir</button>
+                    </Link>
+                    {canManageData && !cancelled && (
+                      <button
+                        type="button"
+                        className="btn-danger"
+                        disabled={cancellingId === order.id}
+                        onClick={() => handleCancel(order)}
+                      >
+                        {cancellingId === order.id ? 'Anulando…' : 'Anular'}
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

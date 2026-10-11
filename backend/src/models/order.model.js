@@ -94,6 +94,28 @@ const Order = sequelize.define('Order', {
     type: DataTypes.STRING,
     allowNull: true,
   },
+  // 'active' o 'cancelled'. Los remitos anulados no cuentan en los reportes.
+  status: {
+    type: DataTypes.STRING(20),
+    allowNull: false,
+    defaultValue: 'active',
+    validate: { isIn: [['active', 'cancelled']] },
+  },
+  cancelledAt: {
+    type: DataTypes.DATE,
+    allowNull: true,
+    field: 'cancelled_at',
+  },
+  cancelReason: {
+    type: DataTypes.STRING,
+    allowNull: true,
+    field: 'cancel_reason',
+  },
+  cancelledById: {
+    type: DataTypes.UUID,
+    allowNull: true,
+    field: 'cancelled_by_id',
+  },
 }, {
   tableName: 'orders',
 });

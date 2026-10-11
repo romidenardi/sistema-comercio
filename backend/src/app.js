@@ -12,6 +12,8 @@ import customerRoutes from './routes/customer.routes.js';
 import supplierRoutes from './routes/supplier.routes.js';
 import purchaseRoutes from './routes/purchase.routes.js';
 import orderRoutes from './routes/order.routes.js';
+import orderCancelRoutes from './routes/orderCancel.routes.js';
+import reportRoutes from './routes/report.routes.js';
 import importRoutes from './routes/import.routes.js';
 import userRoutes from './routes/user.routes.js';
 import { authMiddleware } from './middlewares/auth.middleware.js';
@@ -51,7 +53,9 @@ app.use('/api/payments', authMiddleware, paymentRoutes);
 app.use('/api/customers', authMiddleware, customerRoutes);
 app.use('/api/suppliers', authMiddleware, supplierRoutes);
 app.use('/api/purchases', authMiddleware, purchaseRoutes);
-app.use('/api/orders', authMiddleware, orderRoutes);
+// La anulación va antes que el resto de rutas de remitos; el rol se exige dentro de su ruta
+app.use('/api/orders', authMiddleware, orderCancelRoutes, orderRoutes);
+app.use('/api/reports', authMiddleware, requireRole('admin', 'editor'), reportRoutes);
 app.use('/api/imports', authMiddleware, forbidInDemo, importRoutes);
 app.use('/api/users', authMiddleware, forbidInDemo, requireRole('admin'), userRoutes);
 
