@@ -1,4 +1,5 @@
-import { Outlet, NavLink } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
 import logo from '../../assets/logo.png';
 
@@ -10,6 +11,37 @@ const ROLE_LABELS = {
 
 const Layout = () => {
   const { logout, role, user, isDemo } = useAuth();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const location = useLocation();
+
+  // Cierra el menú al navegar a otra pantalla
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [location.pathname]);
+
+  // Con el menú abierto: Escape lo cierra, no se scrollea el fondo y,
+  // si la ventana pasa a tamaño escritorio, se cierra solo
+  useEffect(() => {
+    if (!menuOpen) return undefined;
+
+    const onKey = (e) => {
+      if (e.key === 'Escape') setMenuOpen(false);
+    };
+    const desktop = window.matchMedia('(min-width: 861px)');
+    const onChange = (e) => {
+      if (e.matches) setMenuOpen(false);
+    };
+
+    window.addEventListener('keydown', onKey);
+    desktop.addEventListener('change', onChange);
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      desktop.removeEventListener('change', onChange);
+      document.body.style.overflow = '';
+    };
+  }, [menuOpen]);
 
   const handleLogout = () => {
     if (confirm('¿Cerrar sesión?')) {
@@ -22,7 +54,25 @@ const Layout = () => {
 
   return (
     <div className="app-layout">
-      <aside className="sidebar">
+      <header className="mobile-topbar">
+        <button
+          type="button"
+          className="menu-toggle"
+          aria-label={menuOpen ? 'Cerrar menú' : 'Abrir menú'}
+          aria-expanded={menuOpen}
+          aria-controls="main-sidebar"
+          onClick={() => setMenuOpen((open) => !open)}
+        >
+          <span />
+          <span />
+          <span />
+        </button>
+        <img src={logo} alt="Talarix" className="sidebar-logo" />
+      </header>
+
+      {menuOpen && <div className="sidebar-overlay" onClick={() => setMenuOpen(false)} />}
+
+      <aside id="main-sidebar" className={`sidebar${menuOpen ? ' open' : ''}`}>
         <div className="sidebar-brand">
           <img src={logo} alt="Talarix" className="sidebar-logo" />
         </div>
