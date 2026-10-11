@@ -268,7 +268,7 @@ export default function Reports() {
   const [from, setFrom] = useState(initial.from);
   const [to, setTo] = useState(initial.to);
   const [groupBy, setGroupBy] = useState('day');
-  const [data, setData] = useState(null);
+  const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -277,9 +277,9 @@ export default function Reports() {
     let active = true;
     setLoading(true);
     setError('');
-    setData(null);
+    setResult(null);
     FETCHERS[tab]({ from, to, groupBy })
-      .then((res) => { if (active) setData(res.data); })
+      .then((res) => { if (active) setResult({ tab, data: res.data }); })
       .catch((err) => {
         if (active) setError(err.response?.data?.message || 'No se pudo cargar el reporte');
       })
@@ -294,7 +294,9 @@ export default function Reports() {
     setTo(range.to);
   };
 
-  const View = VIEWS[tab];
+    const View = VIEWS[tab];
+    // Solo se muestran datos que corresponden a la solapa activa
+    const data = result && result.tab === tab ? result.data : null;
 
   return (
     <div className="reports-page">
