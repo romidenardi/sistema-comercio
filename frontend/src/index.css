@@ -1374,3 +1374,57 @@ button.report-export:disabled {
     padding-left: calc(42% + 24px);
   }
 }
+
+/* ---------- Escáner de códigos de barras ---------- */
+
+.input-with-action {
+  display: flex;
+  gap: 6px;
+  align-items: stretch;
+}
+
+.input-with-action input {
+  flex: 1;
+  min-width: 0;
+}
+
+.scan-bar {
+  background: var(--color-bg);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius);
+  padding: 12px;
+}
+
+.scanner-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: color-mix(in srgb, var(--color-text) 60%, transparent);
+}
+
+.scanner-modal {
+  width: 100%;
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+}
+
+.scanner-modal h3 {
+  margin: 0;
+}
+
+.scanner-region {
+  width: 100%;
+  min-height: 200px;
+  background: var(--color-text);
+  border-radius: var(--radius);
+  overflow: hidden;
+}

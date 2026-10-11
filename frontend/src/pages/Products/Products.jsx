@@ -4,6 +4,7 @@ import { useResource } from '../../hooks/useResource.js';
 import * as productsApi from '../../api/products.api.js';
 import { getCategories } from '../../api/categories.api.js';
 import StockMovementPanel from '../../components/common/StockMovementPanel.jsx';
+import BarcodeScanner from '../../components/common/BarcodeScanner.jsx';
 import Spinner from '../../components/common/Spinner.jsx';
 
 const api = {
@@ -19,10 +20,22 @@ const Products = () => {
   const [editingId, setEditingId] = useState(null);
   const [stockPanelId, setStockPanelId] = useState(null);
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm({
+  const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm({
     defaultValues: { unitType: 'unit', vatRate: 21 },
   });
   const editForm = useForm();
+  const [scanTarget, setScanTarget] = useState(null); // 'create' | 'edit' | null
+
+  // Los lectores mandan Enter al terminar: no debe enviar el formulario
+  const blockEnter = (e) => {
+    if (e.key === 'Enter') e.preventDefault();
+  };
+
+  const handleScanned = (code) => {
+    if (scanTarget === 'edit') editForm.setValue('barcode', code, { shouldDirty: true });
+    else setValue('barcode', code, { shouldDirty: true });
+    setScanTarget(null);
+  };
 
   useEffect(() => {
     getCategories().then(({ data }) => setCategories(data));
@@ -97,7 +110,12 @@ const Products = () => {
 
         <div className="field">
           <label htmlFor="barcode">Código de barras</label>
-          <input id="barcode" placeholder="Ej: 7791234567890" {...register('barcode')} />
+          <div className="input-with-action">
+            <input id="barcode" placeholder="Ej: 7791234567890" {...register('barcode')} onKeyDown={blockEnter} />
+            <button type="button" className="scan-button" onClick={() => setScanTarget('create')}>
+              Escanear
+            </button>
+          </div>
         </div>
 
         <div className="field">
@@ -193,7 +211,12 @@ const Products = () => {
                         </div>
                         <div className="field">
                           <label htmlFor={`edit-barcode-${product.id}`}>Código de barras</label>
-                          <input id={`edit-barcode-${product.id}`} {...editForm.register('barcode')} />
+                          <div className="input-with-action">
+                            <input id={`edit-barcode-${product.id}`} {...editForm.register('barcode')} onKeyDown={blockEnter} />
+                            <button type="button" className="scan-button" onClick={() => setScanTarget('edit')}>
+                              Escanear
+                            </button>
+                          </div>
                         </div>
                         <div className="field">
                           <label htmlFor={`edit-name-${product.id}`}>Nombre</label>
@@ -287,6 +310,10 @@ const Products = () => {
           </tbody>
         </table>
       </div>
+
+      {scanTarget && (
+        <BarcodeScanner onDetected={handleScanned} onClose={() => setScanTarget(null)} />
+      )}
     </div>
   );
 };
