@@ -15,13 +15,13 @@ const InstallmentPlan = sequelize.define('InstallmentPlan', {
   },
   installments: {
     type: DataTypes.INTEGER,
-    allowNull: false, // cantidad de cuotas, ej: 3, 6, 12
+    allowNull: false, 
   },
   interestRate: {
     type: DataTypes.DECIMAL(5, 2),
     allowNull: false,
     defaultValue: 0,
-    field: 'interest_rate', // porcentaje de interés, ej: 15.5
+    field: 'interest_rate', 
   },
     active: {
     type: DataTypes.BOOLEAN,

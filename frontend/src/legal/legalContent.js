@@ -3,7 +3,7 @@ export const LEGAL_VERSION = '2026-10-borrador-1';
 export const LEGAL_IS_DRAFT = true; // pasar a false cuando el profesional valide
 
 export const TERMS = {
-  title: 'Términos y condiciones de uso de la beta',
+  title: 'Términos y Condiciones de uso de la beta',
   intro:
     '**Talarix** es operado por **Romina Denardi**, CUIT **27-28375243-2**, con domicilio en **Sargento Cabral 335, Rafaela, Santa Fe**, contacto: **rominadenardi@gmail.com** (en adelante, "el Prestador"). Quien usa el sistema es, según el caso, "el Comercio" (la persona o empresa invitada) o "el Usuario" (cada persona con acceso dentro del Comercio).',
   sections: [
@@ -29,7 +29,7 @@ export const TERMS = {
 };
 
 export const PRIVACY = {
-  title: 'Aviso de privacidad',
+  title: 'Aviso de Privacidad',
   intro:
     'Marco: Ley 25.326 de Protección de los Datos Personales y normativa de la Agencia de Acceso a la Información Pública (AAIP), autoridad de control.',
   sections: [

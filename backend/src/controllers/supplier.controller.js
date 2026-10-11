@@ -18,7 +18,7 @@ export const updateSupplier = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const supplier = await Supplier.findOne({ where: { id, businessId: req.user.businessId } });
   if (!supplier) {
-    const error = new Error('Supplier not found');
+    const error = new Error('Proveedor no encontrado');
     error.status = 404;
     throw error;
   }
@@ -30,7 +30,7 @@ export const deleteSupplier = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const supplier = await Supplier.findOne({ where: { id, businessId: req.user.businessId } });
   if (!supplier) {
-    const error = new Error('Supplier not found');
+    const error = new Error('Proveedor no encontrado');
     error.status = 404;
     throw error;
   }

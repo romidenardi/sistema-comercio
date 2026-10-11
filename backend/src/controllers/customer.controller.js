@@ -18,7 +18,7 @@ export const updateCustomer = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const customer = await Customer.findOne({ where: { id, businessId: req.user.businessId } });
   if (!customer) {
-    const error = new Error('Customer not found');
+    const error = new Error('Cliente no encontrado');
     error.status = 404;
     throw error;
   }
@@ -30,7 +30,7 @@ export const deleteCustomer = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const customer = await Customer.findOne({ where: { id, businessId: req.user.businessId } });
   if (!customer) {
-    const error = new Error('Customer not found');
+    const error = new Error('Cliente no encontrado');
     error.status = 404;
     throw error;
   }

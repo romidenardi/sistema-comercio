@@ -53,7 +53,6 @@ app.use('/api/payments', authMiddleware, paymentRoutes);
 app.use('/api/customers', authMiddleware, customerRoutes);
 app.use('/api/suppliers', authMiddleware, supplierRoutes);
 app.use('/api/purchases', authMiddleware, purchaseRoutes);
-// La anulación va antes que el resto de rutas de remitos; el rol se exige dentro de su ruta
 app.use('/api/orders', authMiddleware, orderCancelRoutes, orderRoutes);
 app.use('/api/reports', authMiddleware, requireRole('admin', 'editor'), reportRoutes);
 app.use('/api/imports', authMiddleware, forbidInDemo, importRoutes);

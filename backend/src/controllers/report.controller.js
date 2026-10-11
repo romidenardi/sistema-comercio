@@ -10,11 +10,10 @@ const { Op } = pkg;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const MAX_RANGE_DAYS = 366;
-const TZ_OFFSET_MS = 3 * 60 * 60 * 1000; // Argentina: UTC-3, sin horario de verano
-const LOW_STOCK_THRESHOLD = 5; // regla fija hasta que el producto tenga stock mínimo
+const TZ_OFFSET_MS = 3 * 60 * 60 * 1000; 
+const LOW_STOCK_THRESHOLD = 5; 
 const KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-// ---------- Fechas (todo en hora argentina) ----------
 const dayKey = (date) => new Date(date.getTime() - TZ_OFFSET_MS).toISOString().slice(0, 10);
 const startOfDay = (key) => new Date(`${key}T00:00:00-03:00`);
 const addDays = (key, n) => {
@@ -53,7 +52,6 @@ const readRange = (query) => {
   return { from, to, start, end };
 };
 
-// ---------- Datos y cálculos comunes ----------
 // Los remitos anulados nunca cuentan
 const loadOrders = (businessId, start, end) =>
   Order.findAll({
@@ -96,7 +94,6 @@ const loadProductsMap = async (businessId, ids) => {
   return new Map(products.map((p) => [p.id, p]));
 };
 
-// ---------- Ventas por período ----------
 export const salesSummary = asyncHandler(async (req, res) => {
   const { businessId } = req.user;
   const { from, to, start, end } = readRange(req.query);
@@ -104,7 +101,6 @@ export const salesSummary = asyncHandler(async (req, res) => {
 
   const orders = await loadOrders(businessId, start, end);
 
-  // Todos los períodos del rango, aunque no hayan tenido ventas
   const series = new Map();
   for (let key = from; key <= to; key = addDays(key, 1)) {
     const k = periodKey(startOfDay(key), groupBy);
@@ -145,7 +141,6 @@ export const salesSummary = asyncHandler(async (req, res) => {
   });
 });
 
-// ---------- Ventas por producto y por categoría ----------
 export const salesByProduct = asyncHandler(async (req, res) => {
   const { businessId } = req.user;
   const { from, to, start, end } = readRange(req.query);
@@ -158,7 +153,7 @@ export const salesByProduct = asyncHandler(async (req, res) => {
     for (const item of order.items) {
       const row = byProduct.get(item.productId) || { units: 0, amount: 0 };
       row.units += Number(item.quantity);
-      row.amount += Number(item.quantity) * Number(item.unitPrice) * scale; // con descuentos aplicados
+      row.amount += Number(item.quantity) * Number(item.unitPrice) * scale; 
       byProduct.set(item.productId, row);
     }
   }
@@ -196,7 +191,6 @@ export const salesByProduct = asyncHandler(async (req, res) => {
   });
 });
 
-// ---------- Ventas por cliente ----------
 export const salesByCustomer = asyncHandler(async (req, res) => {
   const { businessId } = req.user;
   const { from, to, start, end } = readRange(req.query);
@@ -214,7 +208,7 @@ export const salesByCustomer = asyncHandler(async (req, res) => {
     };
     row.orders += 1;
     row.total += Number(order.total);
-    row.lastPurchase = dayKey(order.date); // las órdenes vienen ordenadas por fecha
+    row.lastPurchase = dayKey(order.date); 
     byCustomer.set(order.customerId, row);
   }
 
@@ -226,7 +220,6 @@ export const salesByCustomer = asyncHandler(async (req, res) => {
   });
 });
 
-// ---------- Ventas por forma de pago ----------
 export const salesByPayment = asyncHandler(async (req, res) => {
   const { businessId } = req.user;
   const { from, to, start, end } = readRange(req.query);
@@ -268,7 +261,6 @@ export const salesByPayment = asyncHandler(async (req, res) => {
   });
 });
 
-// ---------- IVA de ventas ----------
 export const vatReport = asyncHandler(async (req, res) => {
   const { businessId } = req.user;
   const { from, to, start, end } = readRange(req.query);
@@ -325,7 +317,6 @@ export const vatReport = asyncHandler(async (req, res) => {
   });
 });
 
-// ---------- Panel de inicio ----------
 export const dashboard = asyncHandler(async (req, res) => {
   const { businessId } = req.user;
 

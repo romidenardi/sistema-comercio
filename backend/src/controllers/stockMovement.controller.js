@@ -40,7 +40,7 @@ export const createStockMovement = asyncHandler(async (req, res) => {
       transaction: t,
       lock: t.LOCK.UPDATE,
     });
-    if (!product) throw httpError('Product not found', 404);
+    if (!product) throw httpError('Producto no encontrado', 404);
 
     let delta;
     if (type === 'in') {

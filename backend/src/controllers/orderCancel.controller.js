@@ -37,7 +37,6 @@ export const cancelOrder = asyncHandler(async (req, res) => {
       ? customer.businessName || [customer.firstName, customer.lastName].filter(Boolean).join(' ')
       : 'cliente';
 
-    // Un solo movimiento por producto, aunque se repita en varias filas
     const quantityByProduct = new Map();
     for (const item of items) {
       quantityByProduct.set(

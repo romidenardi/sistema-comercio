@@ -71,7 +71,6 @@ const Purchases = () => {
 
   const onSubmit = async (formData) => {
     try {
-      // 1) Valido todo lo nuevo antes de crear nada
       if (isNewSupplier && !formData.newSupplier.name) {
         showToast('Completá el nombre del proveedor nuevo', 'error');
         return;
@@ -91,7 +90,6 @@ const Purchases = () => {
         }
       }
 
-      // 2) Proveedor nuevo
       let supplierId = formData.supplierId;
       if (isNewSupplier) {
         const { name, cuit, phone, email } = formData.newSupplier;
@@ -102,12 +100,10 @@ const Purchases = () => {
           email: email || null,
         });
         supplierId = newSupplier.id;
-        // Si la compra falla más adelante, el proveedor queda elegido y no se vuelve a crear
         setSuppliers((prev) => [...prev, newSupplier]);
         setValue('supplierId', newSupplier.id);
       }
 
-      // 3) Productos nuevos (se crean con stock 0; la compra les suma las unidades)
       const payloadItems = [];
       for (let i = 0; i < formData.items.length; i += 1) {
         const item = formData.items[i];

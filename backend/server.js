@@ -26,7 +26,6 @@ const start = async () => {
     await sequelize.authenticate();
     console.log('Conexión a MySQL exitosa');
 
-    // sync() solo crea tablas nuevas; los cambios de columnas van por SQL (ver /migrations)
     await sequelize.sync();
 
     app.listen(PORT, () => console.log(`Servidor corriendo en puerto ${PORT}`));

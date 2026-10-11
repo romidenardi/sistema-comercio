@@ -295,7 +295,6 @@ export default function Reports() {
   };
 
     const View = VIEWS[tab];
-    // Solo se muestran datos que corresponden a la solapa activa
     const data = result && result.tab === tab ? result.data : null;
 
   return (

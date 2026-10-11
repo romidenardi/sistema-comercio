@@ -99,7 +99,6 @@ const Orders = () => {
     return Math.max((requestedByProduct[productId] || 0) - Number(product.stock), 0);
   };
 
-  // Importe bruto (antes de descuento), neto e IVA, calculados por ítem según el IVA de cada producto
   const { grossSubtotal, grossVat, grossTotal } = (watchedItems || []).reduce((acc, item) => {
     const vatRate = item.productId === NEW_PRODUCT
       ? (item.newProduct?.vatRate === '' ? 0 : Number(item.newProduct?.vatRate) || 0)
@@ -150,7 +149,6 @@ const Orders = () => {
     }
 
     try {
-      // 1) Valido todo lo nuevo antes de crear nada
       if (isNewCustomer) {
         const { businessName, firstName, fiscalCondition } = formData.newCustomer;
         if (!fiscalCondition || (!businessName && !firstName)) {
@@ -173,7 +171,6 @@ const Orders = () => {
         }
       }
 
-      // 2) Cliente nuevo
       let customerId = formData.customerId;
       if (isNewCustomer) {
         const { businessName, firstName, lastName, fiscalCondition } = formData.newCustomer;
@@ -184,12 +181,10 @@ const Orders = () => {
           fiscalCondition,
         });
         customerId = newCustomer.id;
-        // Si el remito falla más adelante, el cliente queda elegido y no se vuelve a crear
         setCustomers((prev) => [...prev, newCustomer]);
         setValue('customerId', newCustomer.id);
       }
 
-      // 3) Productos nuevos (se crean con stock 0 y se les carga la cantidad del remito)
       const payloadItems = [];
       for (let i = 0; i < formData.items.length; i += 1) {
         const item = formData.items[i];
@@ -208,7 +203,6 @@ const Orders = () => {
           });
           productId = createdProduct.id;
           addStock = true;
-          // Si el remito falla más adelante, el producto queda elegido y no se vuelve a crear
           setProducts((prev) => [...prev, createdProduct]);
           setValue(`items.${i}.productId`, createdProduct.id);
           setValue(`items.${i}.addStock`, true);
@@ -222,7 +216,6 @@ const Orders = () => {
         });
       }
 
-      // 4) Remito
       const payload = {
         customerId,
         paymentId: formData.paymentId,
@@ -344,7 +337,7 @@ const Orders = () => {
 
         <div className="inline-customer-form">
           <div className="field">
-            <label htmlFor="discountPercent">Descuento (%)</label>
+            <label htmlFor="discountPercent">Descuento en %</label>
             <input
               id="discountPercent"
               type="number"
@@ -356,7 +349,7 @@ const Orders = () => {
             />
           </div>
           <div className="field">
-            <label htmlFor="discountAmount">Descuento fijo / bono ($)</label>
+            <label htmlFor="discountAmount">Descuento por monto ($)</label>
             <input
               id="discountAmount"
               type="number"
@@ -494,7 +487,7 @@ const Orders = () => {
                     {canManageData ? (
                       <label className="stock-warning-label">
                         <input type="checkbox" {...register(`items.${index}.addStock`)} />
-                        Cargar al stock las {shortfall} unidades que faltan al generar el remito
+                        Cargar al stock las {shortfall} unidades que faltan al generar el remito.
                       </label>
                     ) : (
                       <span>Pedile a un editor o administrador que cargue stock.</span>

@@ -16,7 +16,7 @@ const Customer = sequelize.define('Customer', {
   businessName: {
     type: DataTypes.STRING,
     allowNull: true,
-    field: 'business_name', // razón social (si es persona jurídica)
+    field: 'business_name', // razón social
   },
   firstName: {
     type: DataTypes.STRING,
@@ -31,7 +31,7 @@ const Customer = sequelize.define('Customer', {
   fiscalCondition: {
     type: DataTypes.STRING,
     allowNull: false,
-    field: 'fiscal_condition', // ej: "Responsable Inscripto", "Monotributista", "Consumidor Final"
+    field: 'fiscal_condition', 
   },
   cuit: {
     type: DataTypes.STRING,

@@ -21,7 +21,7 @@ export default function Activate() {
 
     if (password.length < 8) return setError('La contraseña debe tener al menos 8 caracteres');
     if (password !== confirm) return setError('Las contraseñas no coinciden');
-    if (!accepted) return setError('Tenés que aceptar los Términos y el Aviso de privacidad');
+    if (!accepted) return setError('Tenés que aceptar los Términos y Condiciones y el Aviso de Privacidad');
 
     setLoading(true);
     try {
@@ -76,9 +76,9 @@ export default function Activate() {
                 onChange={(e) => setAccepted(e.target.checked)} />
               <span>
                 Leí y acepto los{' '}
-                <Link to="/terminos" target="_blank" rel="noopener noreferrer">Términos de la beta</Link>
+                <Link to="/terminos" target="_blank" rel="noopener noreferrer">Términos y Condiciones de la beta</Link>
                 {' '}y el{' '}
-                <Link to="/privacidad" target="_blank" rel="noopener noreferrer">Aviso de privacidad</Link>.
+                <Link to="/privacidad" target="_blank" rel="noopener noreferrer">Aviso de Privacidad</Link>.
                 Entiendo que durante la beta no hay copias de seguridad garantizadas y que mis datos
                 pueden almacenarse en servidores fuera de Argentina.
               </span>

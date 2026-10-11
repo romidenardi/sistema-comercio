@@ -92,7 +92,7 @@ export default function Platform() {
     const next = business.status === 'active' ? 'suspended' : 'active';
     const message =
       next === 'suspended'
-        ? `¿Suspender "${business.name}"? Sus usuarios no van a poder ingresar.`
+        ? `¿Suspender "${business.name}"? Los usuarios no van a poder ingresar.`
         : `¿Reactivar "${business.name}"?`;
     if (!window.confirm(message)) return;
 
@@ -153,7 +153,7 @@ export default function Platform() {
 
   const whatsappUrl = invite
     ? `https://wa.me/?text=${encodeURIComponent(
-        `Hola! Te invito a probar el sistema. Activá tu cuenta y elegí tu contraseña desde este link ` +
+        `¡Hola! Te invito a probar el sistema. Activá tu cuenta y elegí tu contraseña desde este link ` +
           `(vence el ${formatDate(invite.expires)}): ${invite.url}`
       )}`
     : '#';
@@ -201,7 +201,7 @@ export default function Platform() {
           <div className="field">
             <label htmlFor="pf-type">Tipo</label>
             <select id="pf-type" value={form.type} onChange={setField('type')}>
-              <option value="client">Cliente / tester</option>
+              <option value="client">Cliente</option>
               <option value="demo">Demo</option>
             </select>
           </div>

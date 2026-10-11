@@ -48,7 +48,6 @@ export const login = asyncHandler(async (req, res) => {
   });
 });
 
-// El cliente elige su contraseña con el link que le mandó el superadmin
 export const activateAccount = asyncHandler(async (req, res) => {
   const token = String(req.body.token || '');
   const password = String(req.body.password || '');
@@ -58,9 +57,8 @@ export const activateAccount = asyncHandler(async (req, res) => {
     throw httpError(`La contraseña debe tener entre ${MIN_PASSWORD_LENGTH} y ${MAX_PASSWORD_LENGTH} caracteres`);
   }
 
-  // Aceptación obligatoria de la versión vigente de términos y privacidad
   if (req.body.acceptTerms !== true) {
-    throw httpError('Tenés que aceptar los Términos y el Aviso de privacidad para continuar');
+    throw httpError('Tenés que aceptar los Términos y Condiciones y el Aviso de Privacidad para continuar');
   }
   if (req.body.legalVersion !== LEGAL_VERSION) {
     throw httpError('Los términos se actualizaron. Recargá la página e intentá de nuevo.');
@@ -68,7 +66,7 @@ export const activateAccount = asyncHandler(async (req, res) => {
 
   const user = await User.findOne({ where: { inviteTokenHash: hashToken(token) } });
   if (!user || !user.inviteExpiresAt || user.inviteExpiresAt < new Date()) {
-    throw httpError('El link de activación es inválido o venció. Pedí uno nuevo.');
+    throw httpError('El link de activación es inválido o venció. Solicitá uno nuevo.');
   }
 
   user.passwordHash = await bcrypt.hash(password, 10);
