@@ -22,7 +22,7 @@ const Layout = () => {
   return (
     <div className="app-layout">
       <aside className="sidebar">
-        <div className="sidebar-brand">Sistema comercio</div>
+        <div className="sidebar-brand">Talarix</div>
 
         {user && (
           <div className="sidebar-user">
@@ -33,6 +33,7 @@ const Layout = () => {
 
         <nav className="sidebar-nav">
           <NavLink to="/" end>Inicio</NavLink>
+          {canManageData && <NavLink to="/reports">Reportes</NavLink>}
           {canManageData && <NavLink to="/products">Productos</NavLink>}
           {canManageData && <NavLink to="/categories">Categorías</NavLink>}
           {canManageData && <NavLink to="/payments">Formas de pago</NavLink>}

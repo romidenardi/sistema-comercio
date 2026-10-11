@@ -5,6 +5,8 @@ import Terms from '../pages/Legal/Terms.jsx';
 import Privacy from '../pages/Legal/Privacy.jsx';
 import PlatformLogin from '../pages/Platform/PlatformLogin.jsx';
 import Platform from '../pages/Platform/Platform.jsx';
+import Home from '../pages/Home/Home.jsx';
+import Reports from '../pages/Reports/Reports.jsx';
 import Categories from '../pages/Categories/Categories.jsx';
 import Payments from '../pages/Payments/Payments.jsx';
 import Customers from '../pages/Customers/Customers.jsx';
@@ -33,12 +35,13 @@ const AppRoutes = () => {
         <Route path="/orders/:id/print" element={<OrderPrint />} />
 
         <Route element={<Layout />}>
-          <Route path="/" element={<div>Bienvenida</div>} />
+          <Route path="/" element={<Home />} />
 
           <Route path="/orders" element={<Orders />} />
           <Route path="/purchases" element={<Purchases />} />
 
           <Route element={<PrivateRoute allowedRoles={['admin', 'editor']} />}>
+            <Route path="/reports" element={<Reports />} />
             <Route path="/categories" element={<Categories />} />
             <Route path="/payments" element={<Payments />} />
             <Route path="/customers" element={<Customers />} />
