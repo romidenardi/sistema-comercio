@@ -111,12 +111,21 @@ const Products = () => {
         <div className="field">
           <label htmlFor="barcode">Código de barras</label>
           <div className="input-with-action">
-            <input id="barcode" placeholder="Ej: 7791234567890" {...register('barcode')} onKeyDown={blockEnter} />
-            <button type="button" className="scan-button" onClick={() => setScanTarget('create')}>
+            <input
+              id="barcode"
+              placeholder="Escribí o escaneá el código"
+              {...register('barcode')}
+              onKeyDown={blockEnter}
+            />
+            <button
+              type="button"
+              className="scan-button"
+              title="Escanear con la cámara del celular"
+              onClick={() => setScanTarget('create')}
+            >
               Cámara
             </button>
           </div>
-          <small className="field-hint">Escribilo, escanealo con un lector (con el cursor acá) o usá la cámara.</small>
         </div>
 
         <div className="field">
@@ -213,12 +222,21 @@ const Products = () => {
                         <div className="field">
                           <label htmlFor={`edit-barcode-${product.id}`}>Código de barras</label>
                           <div className="input-with-action">
-                            <input id={`edit-barcode-${product.id}`} {...editForm.register('barcode')} onKeyDown={blockEnter} />
-                            <button type="button" className="scan-button" onClick={() => setScanTarget('edit')}>
+                            <input
+                              id={`edit-barcode-${product.id}`}
+                              placeholder="Escribí o escaneá el código"
+                              {...editForm.register('barcode')}
+                              onKeyDown={blockEnter}
+                            />
+                            <button
+                              type="button"
+                              className="scan-button"
+                              title="Escanear con la cámara del celular"
+                              onClick={() => setScanTarget('edit')}
+                            >
                               Cámara
                             </button>
                           </div>
-                          <small className="field-hint">Escribilo, escanealo con un lector (con el cursor acá) o usá la cámara.</small>
                         </div>
                         <div className="field">
                           <label htmlFor={`edit-name-${product.id}`}>Nombre</label>
