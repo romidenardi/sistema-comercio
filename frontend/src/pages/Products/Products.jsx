@@ -113,9 +113,10 @@ const Products = () => {
           <div className="input-with-action">
             <input id="barcode" placeholder="Ej: 7791234567890" {...register('barcode')} onKeyDown={blockEnter} />
             <button type="button" className="scan-button" onClick={() => setScanTarget('create')}>
-              Escanear
+              Cámara
             </button>
           </div>
+          <small className="field-hint">Escribilo, escanealo con un lector (con el cursor acá) o usá la cámara.</small>
         </div>
 
         <div className="field">
@@ -214,9 +215,10 @@ const Products = () => {
                           <div className="input-with-action">
                             <input id={`edit-barcode-${product.id}`} {...editForm.register('barcode')} onKeyDown={blockEnter} />
                             <button type="button" className="scan-button" onClick={() => setScanTarget('edit')}>
-                              Escanear
+                              Cámara
                             </button>
                           </div>
+                          <small className="field-hint">Escribilo, escanealo con un lector (con el cursor acá) o usá la cámara.</small>
                         </div>
                         <div className="field">
                           <label htmlFor={`edit-name-${product.id}`}>Nombre</label>
