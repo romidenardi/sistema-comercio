@@ -8,6 +8,7 @@ import { getProducts, createProduct } from '../../api/products.api.js';
 import { useToast } from '../../context/ToastContext.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
 import Spinner from '../../components/common/Spinner.jsx';
+import ScanBar from '../../components/common/ScanBar.jsx';
 
 const NEW_CUSTOMER = '__new__';
 const NEW_PRODUCT = '__new_product__';
@@ -19,7 +20,7 @@ const emptyItem = () => ({
   quantity: 1,
   unitPrice: 0,
   addStock: false,
-  newProduct: { internalCode: '', name: '', cost: '', vatRate: 21, unitType: 'unit' },
+  newProduct: { internalCode: '', barcode: '', name: '', cost: '', vatRate: 21, unitType: 'unit' },
 });
 
 const Orders = () => {
@@ -142,6 +143,48 @@ const Orders = () => {
     setValue(`items.${index}.addStock`, false);
   };
 
+  // Código leído con el lector USB o con la cámara
+  const handleScan = (rawCode) => {
+    const code = String(rawCode || '').trim();
+    if (!code) return;
+
+    const items = watchedItems || [];
+    const emptyIndex = items.findIndex((it) => !it.productId);
+    const product = products.find((p) => p.barcode === code || p.internalCode === code);
+
+    if (product) {
+      const existing = items.findIndex((it) => it.productId === product.id);
+      if (existing >= 0) {
+        setValue(`items.${existing}.quantity`, (Number(items[existing].quantity) || 0) + 1);
+      } else if (emptyIndex >= 0) {
+        setValue(`items.${emptyIndex}.productId`, product.id);
+        onProductChange(emptyIndex, product.id);
+      } else {
+        append({ ...emptyItem(), productId: product.id, unitPrice: Number(product.price) });
+      }
+      showToast(`${product.name} agregado`);
+      return;
+    }
+
+    if (!canManageData) {
+      showToast(`No hay ningún producto con el código ${code}`, 'error');
+      return;
+    }
+    if (!window.confirm(`El código ${code} no está registrado. ¿Crear un producto nuevo con ese código?`)) {
+      return;
+    }
+    if (emptyIndex >= 0) {
+      setValue(`items.${emptyIndex}.productId`, NEW_PRODUCT);
+      setValue(`items.${emptyIndex}.newProduct.barcode`, code);
+    } else {
+      append({
+        ...emptyItem(),
+        productId: NEW_PRODUCT,
+        newProduct: { ...emptyItem().newProduct, barcode: code },
+      });
+    }
+  };
+
   const onSubmit = async (formData) => {
     if (discountExceedsTotal) {
       showToast('El descuento no puede ser mayor al total del remito', 'error');
@@ -195,6 +238,7 @@ const Orders = () => {
           const np = item.newProduct;
           const { data: createdProduct } = await createProduct({
             internalCode: np.internalCode,
+            barcode: np.barcode || null,
             name: np.name,
             price: Number(item.unitPrice),
             cost: Number(np.cost),
@@ -267,6 +311,7 @@ const Orders = () => {
       setCancellingId(null);
     }
   };
+
   if (loading) return <Spinner label="Cargando remitos..." />;
 
   return (
@@ -366,6 +411,8 @@ const Orders = () => {
           <input id="notes" placeholder="Ej: Entregar antes del viernes" {...register('notes')} />
         </div>
 
+        <ScanBar onScan={handleScan} />
+
         <div className="purchase-items">
           {fields.map((field, index) => {
             const rowProductId = watchedItems?.[index]?.productId;
@@ -433,6 +480,13 @@ const Orders = () => {
                         id={`new-product-code-${index}`}
                         placeholder="Ej: P001"
                         {...register(`items.${index}.newProduct.internalCode`)}
+                      />
+                    </div>
+                    <div className="field">
+                      <label htmlFor={`new-product-barcode-${index}`}>Código de barras</label>
+                      <input
+                        id={`new-product-barcode-${index}`}
+                        {...register(`items.${index}.newProduct.barcode`)}
                       />
                     </div>
                     <div className="field">
@@ -547,7 +601,7 @@ const Orders = () => {
             </tr>
           </thead>
           <tbody>
-                        {orders.map((order) => {
+            {orders.map((order) => {
               const cancelled = order.status === 'cancelled';
               return (
                 <tr key={order.id} className={cancelled ? 'order-cancelled' : ''}>
