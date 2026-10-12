@@ -74,6 +74,8 @@ export default function Platform() {
         title: `Link de activación para ${data.business.name}`,
         url: data.inviteUrl,
         expires: data.inviteExpiresAt,
+        email: payload.adminEmail,
+        emailSent: data.emailSent === true,
       });
       setCopied(false);
       setForm(EMPTY_FORM);
@@ -110,7 +112,7 @@ export default function Platform() {
     if (!admin) return;
     const message =
       `Se anulará la contraseña actual de ${admin.email} y se generará un link nuevo ` +
-      `para que elija una. Sus sesiones abiertas se cerrarán. ¿Continuar?`;
+      `para que elija una (se le enviará también por mail). Sus sesiones abiertas se cerrarán. ¿Continuar?`;
     if (!window.confirm(message)) return;
 
     setError('');
@@ -120,6 +122,8 @@ export default function Platform() {
         title: `Link nuevo para ${data.user.email} (${business.name})`,
         url: data.inviteUrl,
         expires: data.inviteExpiresAt,
+        email: data.user.email,
+        emailSent: data.emailSent === true,
       });
       setCopied(false);
       await load();
@@ -170,6 +174,14 @@ export default function Platform() {
       {invite && (
         <section className="invite-box">
           <strong>{invite.title}</strong>
+          <span
+            className={`invite-mail ${invite.emailSent ? 'invite-mail-ok' : 'invite-mail-warn'}`}
+            role="status"
+          >
+            {invite.emailSent
+              ? `Se envió el mail con la invitación a ${invite.email}.`
+              : `No se pudo enviar el mail a ${invite.email}. Pasale el link por otro medio.`}
+          </span>
           <span>
             Se muestra una sola vez: copialo ahora. Vence el {formatDate(invite.expires)}.
           </span>
@@ -211,7 +223,7 @@ export default function Platform() {
               onChange={setField('trialDays')} />
           </div>
           <button type="submit" disabled={submitting}>
-            {submitting ? 'Creando…' : 'Crear y generar link'}
+            {submitting ? 'Creando…' : 'Crear y enviar invitación'}
           </button>
         </form>
       </section>
