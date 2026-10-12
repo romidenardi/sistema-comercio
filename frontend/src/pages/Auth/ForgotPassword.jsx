@@ -33,7 +33,7 @@ export default function ForgotPassword() {
         {done ? (
           <>
             <p>
-              Si el email corresponde a una cuenta activa, te enviamos un link para continuar.
+              Si el email corresponde a una cuenta activa, te enviaremos un link para continuar.
               Revisá tu bandeja de entrada y la carpeta de spam. El link será valido por una hora.
             </p>
             <p><Link to="/login">Volver a iniciar sesión</Link></p>
