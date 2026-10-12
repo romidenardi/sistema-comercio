@@ -18,24 +18,92 @@ const ROLES = [
   { value: 'operador', label: 'Operador (solo Compras y Remitos)' },
 ];
 
-const Users = () => {
-  const { items: users, loading, create, update, remove } = useResource(api);
+const DEFAULT_CREATE = { role: 'operador', mode: 'password' };
+
+const buildNotice = (mail, email, prefix) => {
+  if (mail?.sent) {
+    return { type: 'ok', text: `${prefix} Enviamos el mail a ${email}.` };
+  }
+  if (mail?.link) {
+    return {
+      type: 'warn',
+      text: `${prefix} No pudimos enviar el mail a ${email}. Copiá este link y pasáselo por otro medio:`,
+      link: mail.link,
+    };
+  }
+  return {
+    type: 'warn',
+    text: `${prefix} No se pudo enviar el aviso por mail a ${email}.`,
+  };
+};
+
+const Notice = ({ notice, onClose }) => {
+  if (!notice) return null;
+  return (
+    <div className={`users-notice users-notice-${notice.type}`} role="status">
+      <p>{notice.text}</p>
+      {notice.link && (
+        <input
+          readOnly
+          value={notice.link}
+          onFocus={(e) => e.target.select()}
+          aria-label="Link para copiar"
+        />
+      )}
+      <button type="button" onClick={onClose}>Cerrar</button>
+    </div>
+  );
+};
+
+const UsersContent = ({ notice, setNotice, reload }) => {
+  const { items: users, loading, update, remove } = useResource(api);
   const { user: currentUser } = useAuth();
   const [editingId, setEditingId] = useState(null);
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm({
-    defaultValues: { role: 'operador' },
+  const { register, handleSubmit, reset, watch, formState: { errors } } = useForm({
+    defaultValues: DEFAULT_CREATE,
   });
   const editForm = useForm();
+  const mode = watch('mode');
 
   const onCreate = async (formData) => {
-    const result = await create({
-      name: formData.name,
-      email: formData.email,
-      password: formData.password,
-      role: formData.role,
-    });
-    if (result.success) reset({ role: 'operador' });
+    setNotice(null);
+    const invite = formData.mode === 'invite';
+    try {
+      const payload = {
+        name: formData.name,
+        email: formData.email,
+        role: formData.role,
+        ...(invite ? { sendInvite: true } : { password: formData.password }),
+      };
+      const { data } = await usersApi.createUser(payload);
+      reset(DEFAULT_CREATE);
+      setNotice(buildNotice(data.mail, formData.email, 'Usuario creado.'));
+      reload();
+    } catch (err) {
+      setNotice({
+        type: 'error',
+        text: err.response?.data?.message || 'No se pudo crear el usuario',
+      });
+    }
+  };
+
+  const onSendLink = async (user) => {
+    const message = user.pendingActivation
+      ? `¿Reenviar la invitación a ${user.email}?`
+      : `¿Enviar a ${user.email} un link para que elija una contraseña nueva?`;
+    if (!confirm(message)) return;
+
+    setNotice(null);
+    try {
+      const { data } = await usersApi.sendAccessLink(user.id);
+      setNotice(buildNotice(data.mail, data.email, 'Listo.'));
+    } catch (err) {
+      setNotice({
+        type: 'error',
+        text: err.response?.data?.message || 'No se pudo generar el link',
+      });
+    }
   };
 
   const startEdit = (user) => {
@@ -75,6 +143,8 @@ const Users = () => {
     <div className="users-page">
       <h1>Usuarios</h1>
 
+      <Notice notice={notice} onClose={() => setNotice(null)} />
+
       <form onSubmit={handleSubmit(onCreate)} className="user-form">
         <div className="field">
           <label htmlFor="name">Nombre</label>
@@ -97,17 +167,6 @@ const Users = () => {
           {errors.email && <span className="error">{errors.email.message}</span>}
         </div>
 
-        <div className="field">
-          <label htmlFor="password">Contraseña</label>
-          <input
-            id="password"
-            type="password"
-            placeholder="Mínimo 6 caracteres"
-            {...register('password', { required: 'La contraseña es obligatoria', minLength: 8 })}
-          />
-          {errors.password && <span className="error">La contraseña debe tener al menos 8 caracteres</span>}
-        </div>
-
         <div className="field field-full">
           <label htmlFor="role">Rol</label>
           <select id="role" {...register('role', { required: true })}>
@@ -117,7 +176,34 @@ const Users = () => {
           </select>
         </div>
 
-        <button type="submit">Agregar usuario</button>
+        <div className="field field-full">
+          <label htmlFor="mode">¿Cómo va a ingresar?</label>
+          <select id="mode" {...register('mode')}>
+            <option value="password">Yo le asigno una contraseña</option>
+            <option value="invite">Enviarle una invitación por email para que elija la suya</option>
+          </select>
+        </div>
+
+        {mode === 'password' && (
+          <div className="field">
+            <label htmlFor="password">Contraseña</label>
+            <input
+              id="password"
+              type="password"
+              autoComplete="new-password"
+              placeholder="Mínimo 8 caracteres"
+              {...register('password', {
+                required: 'La contraseña es obligatoria',
+                minLength: { value: 8, message: 'La contraseña debe tener al menos 8 caracteres' },
+              })}
+            />
+            {errors.password && <span className="error">{errors.password.message}</span>}
+          </div>
+        )}
+
+        <button type="submit">
+          {mode === 'invite' ? 'Crear y enviar invitación' : 'Agregar usuario'}
+        </button>
       </form>
 
       <div className="table-wrapper">
@@ -134,6 +220,11 @@ const Users = () => {
           <tbody>
             {users.map((user) => {
               const isSelf = user.id === currentUser?.id;
+              const statusLabel = !user.active
+                ? 'Inactivo'
+                : user.pendingActivation
+                  ? 'Pendiente de activación'
+                  : 'Activo';
               return (
                 <tr key={user.id}>
                   {editingId === user.id ? (
@@ -152,6 +243,7 @@ const Users = () => {
                           <input
                             id={`edit-password-${user.id}`}
                             type="password"
+                            autoComplete="new-password"
                             placeholder="Dejar vacío para no cambiarla"
                             {...editForm.register('password', { minLength: 8 })}
                           />
@@ -185,9 +277,14 @@ const Users = () => {
                       <td data-label="Nombre">{user.name}{isSelf && ' (vos)'}</td>
                       <td data-label="Email">{user.email}</td>
                       <td data-label="Rol">{roleLabel(user.role)}</td>
-                      <td data-label="Estado">{user.active ? 'Activo' : 'Inactivo'}</td>
+                      <td data-label="Estado">{statusLabel}</td>
                       <td data-label="Acciones">
                         <button onClick={() => startEdit(user)}>Editar</button>
+                        {user.active && (
+                          <button onClick={() => onSendLink(user)}>
+                            {user.pendingActivation ? 'Reenviar invitación' : 'Enviar link de contraseña'}
+                          </button>
+                        )}
                         {!isSelf && (
                           <button onClick={() => onDelete(user.id)}>Eliminar</button>
                         )}
@@ -201,6 +298,20 @@ const Users = () => {
         </table>
       </div>
     </div>
+  );
+};
+
+const Users = () => {
+  const [reloadKey, setReloadKey] = useState(0);
+  const [notice, setNotice] = useState(null);
+
+  return (
+    <UsersContent
+      key={reloadKey}
+      notice={notice}
+      setNotice={setNotice}
+      reload={() => setReloadKey((k) => k + 1)}
+    />
   );
 };
 

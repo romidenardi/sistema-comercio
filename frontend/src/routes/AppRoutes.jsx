@@ -1,6 +1,8 @@
 import { Routes, Route } from 'react-router-dom';
 import Login from '../pages/Login/Login.jsx';
 import Activate from '../pages/Activate/Activate.jsx';
+import ForgotPassword from '../pages/Auth/ForgotPassword.jsx';
+import ResetPassword from '../pages/Auth/ResetPassword.jsx';
 import Terms from '../pages/Legal/Terms.jsx';
 import Privacy from '../pages/Legal/Privacy.jsx';
 import PlatformLogin from '../pages/Platform/PlatformLogin.jsx';
@@ -26,6 +28,8 @@ const AppRoutes = () => {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/activar" element={<Activate />} />
+      <Route path="/olvide-contrasena" element={<ForgotPassword />} />
+      <Route path="/restablecer" element={<ResetPassword />} />
       <Route path="/terminos" element={<Terms />} />
       <Route path="/privacidad" element={<Privacy />} />
       <Route path="/plataforma/login" element={<PlatformLogin />} />

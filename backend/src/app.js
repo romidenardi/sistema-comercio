@@ -41,7 +41,16 @@ const authLimiter = rateLimit({
   legacyHeaders: false,
   message: { message: 'Demasiados intentos. Probá de nuevo en unos minutos.' },
 });
-app.use(['/api/auth/login', '/api/auth/activate', '/api/platform/login'], authLimiter);
+app.use(
+  [
+    '/api/auth/login',
+    '/api/auth/activate',
+    '/api/auth/forgot-password',
+    '/api/auth/reset-password',
+    '/api/platform/login',
+  ],
+  authLimiter
+);
 
 app.use('/api/auth', authRoutes);
 app.use('/api/platform', platformRoutes);
