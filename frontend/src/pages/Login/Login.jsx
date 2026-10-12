@@ -1,5 +1,5 @@
 import { useForm } from 'react-hook-form';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
 
 const Login = () => {
@@ -38,6 +38,10 @@ const Login = () => {
         <button type="submit" disabled={loading}>
           {loading ? 'Ingresando...' : 'Ingresar'}
         </button>
+
+        <p>
+          <Link to="/olvide-contrasena">¿Olvidaste tu contraseña?</Link>
+        </p>
       </form>
     </div>
   );

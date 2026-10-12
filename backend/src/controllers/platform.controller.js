@@ -4,6 +4,8 @@ import { Business, User, PlatformAdmin, sequelize } from '../models/index.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { httpError } from '../utils/httpError.js';
 import { generateInviteToken, INVITE_TTL_MS } from '../utils/inviteToken.js';
+import { sendMail } from '../utils/mailer.js';
+import { inviteEmail } from '../utils/mailTemplates.js';
 import { resetDemoBusiness } from '../services/demo.service.js';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -119,10 +121,22 @@ export const createBusiness = asyncHandler(async (req, res) => {
     }
   }
 
+  const inviteUrl = buildInviteUrl(token);
+  const mail = await sendMail({
+    to: adminEmail,
+    ...inviteEmail({
+      name: adminName,
+      businessName: name,
+      url: inviteUrl,
+      expiresInMs: INVITE_TTL_MS,
+    }),
+  });
+
   res.status(201).json({
     business: { id: business.id, name: business.name, type: business.type, status: business.status },
-    inviteUrl: buildInviteUrl(token),
+    inviteUrl,
     inviteExpiresAt,
+    emailSent: mail.sent,
     demoSeeded,
   });
 });
@@ -153,10 +167,22 @@ export const reinviteUser = asyncHandler(async (req, res) => {
 
   await user.update({ passwordHash: null, inviteTokenHash: hash, inviteExpiresAt, active: true });
 
+  const inviteUrl = buildInviteUrl(token);
+  const mail = await sendMail({
+    to: user.email,
+    ...inviteEmail({
+      name: user.name,
+      businessName: business.name,
+      url: inviteUrl,
+      expiresInMs: INVITE_TTL_MS,
+    }),
+  });
+
   res.json({
     user: { id: user.id, name: user.name, email: user.email },
-    inviteUrl: buildInviteUrl(token),
+    inviteUrl,
     inviteExpiresAt,
+    emailSent: mail.sent,
   });
 });
 
