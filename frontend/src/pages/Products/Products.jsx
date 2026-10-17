@@ -6,6 +6,8 @@ import { getCategories } from '../../api/categories.api.js';
 import StockMovementPanel from '../../components/common/StockMovementPanel.jsx';
 import BarcodeScanner from '../../components/common/BarcodeScanner.jsx';
 import Spinner from '../../components/common/Spinner.jsx';
+import VatSelect from '../../components/common/VatSelect.jsx';
+import { toPercentOrNull, vatToFormValue } from '../../utils/taxes.js';
 
 const api = {
   getAll: productsApi.getProducts,
@@ -21,7 +23,7 @@ const Products = () => {
   const [stockPanelId, setStockPanelId] = useState(null);
 
   const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm({
-    defaultValues: { unitType: 'unit', vatRate: 21 },
+    defaultValues: { unitType: 'unit', vatRate: '21' },
   });
   const editForm = useForm();
   const [scanTarget, setScanTarget] = useState(null); // 'create' | 'edit' | null
@@ -50,9 +52,10 @@ const Products = () => {
       cost: Number(formData.cost),
       promoPrice: formData.promoPrice ? Number(formData.promoPrice) : null,
       vatRate: Number(formData.vatRate),
+      otherTaxes: toPercentOrNull(formData.otherTaxes),
       categoryId: formData.categoryId || null,
     });
-    if (result.success) reset({ unitType: 'unit', vatRate: 21 });
+    if (result.success) reset({ unitType: 'unit', vatRate: '21' });
   };
 
   const startEdit = (product) => {
@@ -69,7 +72,8 @@ const Products = () => {
       price: product.price,
       promoPrice: product.promoPrice || '',
       cost: product.cost,
-      vatRate: product.vatRate,
+      vatRate: vatToFormValue(product.vatRate),
+      otherTaxes: product.otherTaxes ?? '',
       description: product.description || '',
       active: String(product.active),
     });
@@ -82,6 +86,7 @@ const Products = () => {
       cost: Number(formData.cost),
       promoPrice: formData.promoPrice ? Number(formData.promoPrice) : null,
       vatRate: Number(formData.vatRate),
+      otherTaxes: toPercentOrNull(formData.otherTaxes),
       categoryId: formData.categoryId || null,
       active: formData.active === 'true',
     });
@@ -129,7 +134,7 @@ const Products = () => {
         </div>
 
         <div className="field">
-          <label htmlFor="name">Nombre</label>
+          <label htmlFor="name">Producto</label>
           <input id="name" placeholder="Ej: Cerveza IPA 500ml" {...register('name', { required: 'Obligatorio' })} />
           {errors.name && <span className="error">{errors.name.message}</span>}
         </div>
@@ -178,8 +183,21 @@ const Products = () => {
         </div>
 
         <div className="field">
-          <label htmlFor="vatRate">Alícuota de IVA (%)</label>
-          <input id="vatRate" type="number" step="0.01" placeholder="Ej: 21" {...register('vatRate')} />
+          <label htmlFor="vatRate">IVA</label>
+          <VatSelect id="vatRate" registration={register('vatRate')} />
+        </div>
+
+        <div className="field">
+          <label htmlFor="otherTaxes">Impuestos internos (%) <small>(opcional)</small></label>
+          <input
+            id="otherTaxes"
+            type="number"
+            step="0.01"
+            min="0"
+            max="100"
+            placeholder="Ej: 8"
+            {...register('otherTaxes')}
+          />
         </div>
 
         <div className="field field-full">
@@ -199,7 +217,7 @@ const Products = () => {
           <thead>
             <tr>
               <th>Código</th>
-              <th>Nombre</th>
+              <th>Producto</th>
               <th>Categoría</th>
               <th>Precio</th>
               <th>Precio promo</th>
@@ -239,7 +257,7 @@ const Products = () => {
                           </div>
                         </div>
                         <div className="field">
-                          <label htmlFor={`edit-name-${product.id}`}>Nombre</label>
+                          <label htmlFor={`edit-name-${product.id}`}>Producto</label>
                           <input id={`edit-name-${product.id}`} {...editForm.register('name')} />
                         </div>
                         <div className="field">
@@ -279,8 +297,24 @@ const Products = () => {
                           <input id={`edit-cost-${product.id}`} type="number" step="0.01" {...editForm.register('cost')} />
                         </div>
                         <div className="field">
-                          <label htmlFor={`edit-vatRate-${product.id}`}>Alícuota IVA (%)</label>
-                          <input id={`edit-vatRate-${product.id}`} type="number" step="0.01" {...editForm.register('vatRate')} />
+                          <label htmlFor={`edit-vatRate-${product.id}`}>IVA</label>
+                          <VatSelect
+                            id={`edit-vatRate-${product.id}`}
+                            registration={editForm.register('vatRate')}
+                            legacyValue={product.vatRate}
+                          />
+                        </div>
+                        <div className="field">
+                          <label htmlFor={`edit-otherTaxes-${product.id}`}>Impuestos internos (%) <small>(opcional)</small></label>
+                          <input
+                            id={`edit-otherTaxes-${product.id}`}
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            max="100"
+                            placeholder="Ej: 8"
+                            {...editForm.register('otherTaxes')}
+                          />
                         </div>
                         <div className="field">
                           <label htmlFor={`edit-active-${product.id}`}>Estado</label>
@@ -302,7 +336,7 @@ const Products = () => {
                   ) : (
                     <>
                       <td data-label="Código">{product.internalCode}</td>
-                      <td data-label="Nombre">{product.name}</td>
+                      <td data-label="Producto">{product.name}</td>
                       <td data-label="Categoría">{categoryName(product.categoryId)}</td>
                       <td data-label="Precio">${Number(product.price).toFixed(2)}</td>
                       <td data-label="Precio promo">{product.promoPrice ? `$${Number(product.promoPrice).toFixed(2)}` : '—'}</td>

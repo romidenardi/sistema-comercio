@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useForm, useFieldArray } from 'react-hook-form';
+import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { getOrders, createOrder, cancelOrder } from '../../api/orders.api.js';
 import { getCustomers, createCustomer } from '../../api/customers.api.js';
 import { getPayments } from '../../api/payments.api.js';
@@ -9,6 +9,9 @@ import { useToast } from '../../context/ToastContext.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
 import Spinner from '../../components/common/Spinner.jsx';
 import ScanBar from '../../components/common/ScanBar.jsx';
+import SearchSelect from '../../components/common/SearchSelect.jsx';
+import VatSelect from '../../components/common/VatSelect.jsx';
+import { splitPrice, toPercentOrNull } from '../../utils/taxes.js';
 
 const NEW_CUSTOMER = '__new__';
 const NEW_PRODUCT = '__new_product__';
@@ -20,7 +23,7 @@ const emptyItem = () => ({
   quantity: 1,
   unitPrice: 0,
   addStock: false,
-  newProduct: { internalCode: '', barcode: '', name: '', cost: '', vatRate: 21, unitType: 'unit' },
+  newProduct: { internalCode: '', barcode: '', name: '', cost: '', vatRate: '21', otherTaxes: '', unitType: 'unit' },
 });
 
 const Orders = () => {
@@ -34,7 +37,7 @@ const Orders = () => {
   const { role } = useAuth();
   const canManageData = role === 'admin' || role === 'editor';
 
-  const { register, control, handleSubmit, reset, watch, setValue } = useForm({
+  const { register, control, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm({
     defaultValues: {
       customerId: '',
       paymentId: '',
@@ -86,7 +89,6 @@ const Orders = () => {
     setValue('installmentPlanId', '');
   }, [selectedPaymentId, setValue]);
 
-  // Cantidad total pedida por producto (un mismo producto puede estar en varias filas)
   const requestedByProduct = (watchedItems || []).reduce((acc, item) => {
     if (item.productId && item.productId !== NEW_PRODUCT) {
       acc[item.productId] = (acc[item.productId] || 0) + (Number(item.quantity) || 0);
@@ -100,19 +102,20 @@ const Orders = () => {
     return Math.max((requestedByProduct[productId] || 0) - Number(product.stock), 0);
   };
 
-  const { grossSubtotal, grossVat, grossTotal } = (watchedItems || []).reduce((acc, item) => {
-    const vatRate = item.productId === NEW_PRODUCT
-      ? (item.newProduct?.vatRate === '' ? 0 : Number(item.newProduct?.vatRate) || 0)
-      : Number(products.find((p) => p.id === item.productId)?.vatRate) || 0;
+  const { grossSubtotal, grossVat, grossInternal, grossTotal } = (watchedItems || []).reduce((acc, item) => {
+    const isNew = item.productId === NEW_PRODUCT;
+    const product = isNew ? null : products.find((p) => p.id === item.productId);
+    const vatRate = isNew ? item.newProduct?.vatRate : product?.vatRate;
+    const internalRate = isNew ? item.newProduct?.otherTaxes : product?.otherTaxes;
     const itemTotal = (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0);
-    const itemNet = vatRate > 0 ? itemTotal / (1 + vatRate / 100) : itemTotal;
-    const itemVat = itemTotal - itemNet;
+    const { net, vat, internal } = splitPrice(itemTotal, vatRate, internalRate);
     return {
-      grossSubtotal: acc.grossSubtotal + itemNet,
-      grossVat: acc.grossVat + itemVat,
+      grossSubtotal: acc.grossSubtotal + net,
+      grossVat: acc.grossVat + vat,
+      grossInternal: acc.grossInternal + internal,
       grossTotal: acc.grossTotal + itemTotal,
     };
-  }, { grossSubtotal: 0, grossVat: 0, grossTotal: 0 });
+  }, { grossSubtotal: 0, grossVat: 0, grossInternal: 0, grossTotal: 0 });
 
   const discountPercent = Number(watchedDiscountPercent) || 0;
   const discountAmount = Number(watchedDiscountAmount) || 0;
@@ -124,6 +127,7 @@ const Orders = () => {
   const scale = grossTotal > 0 ? total / grossTotal : 1;
   const subtotal = grossSubtotal * scale;
   const vatAmount = grossVat * scale;
+  const internalTaxAmount = grossInternal * scale;
 
   const selectedCustomer = customers.find((c) => c.id === selectedCustomerId);
   const fiscalConditionForCalc = isNewCustomer ? newCustomerFiscalCondition : selectedCustomer?.fiscalCondition;
@@ -204,7 +208,7 @@ const Orders = () => {
         if (item.productId === NEW_PRODUCT) {
           const np = item.newProduct || {};
           if (!np.internalCode || !np.name || np.cost === '' || np.cost === undefined) {
-            showToast('Completá código interno, nombre y costo del producto nuevo', 'error');
+            showToast('Completá código interno, producto y costo del producto nuevo', 'error');
             return;
           }
           if (!(Number(item.unitPrice) > 0)) {
@@ -243,6 +247,7 @@ const Orders = () => {
             price: Number(item.unitPrice),
             cost: Number(np.cost),
             vatRate: np.vatRate === '' || np.vatRate === undefined ? 21 : Number(np.vatRate),
+            otherTaxes: toPercentOrNull(np.otherTaxes),
             unitType: np.unitType || 'unit',
           });
           productId = createdProduct.id;
@@ -289,6 +294,18 @@ const Orders = () => {
   };
 
   const customerLabel = (c) => c.businessName || `${c.firstName} ${c.lastName || ''}`.trim();
+  const customerOptions = customers.map((c) => ({
+    value: c.id,
+    label: customerLabel(c),
+    detail: [c.fiscalCondition, c.cuit && `CUIT ${c.cuit}`].filter(Boolean).join(' · '),
+    keywords: [c.firstName, c.lastName, c.businessName, c.cuit],
+  }));
+  const productOptions = products.map((p) => ({
+    value: p.id,
+    label: p.name,
+    detail: [p.internalCode && `Cód. ${p.internalCode}`, `Stock: ${p.stock}`].filter(Boolean).join(' · '),
+    keywords: [p.internalCode, p.barcode, p.brand, p.model],
+  }));
   const displayCustomer = (order) => (order.Customer ? customerLabel(order.Customer) : '—');
 
   const handleCancel = async (order) => {
@@ -321,13 +338,25 @@ const Orders = () => {
       <form onSubmit={handleSubmit(onSubmit)} className="order-form">
         <div className="field">
           <label htmlFor="customerId">Cliente</label>
-          <select id="customerId" {...register('customerId', { required: true })}>
-            <option value="">Elegí un cliente...</option>
-            {customers.map((c) => (
-              <option key={c.id} value={c.id}>{customerLabel(c)}</option>
-            ))}
-            {canManageData && <option value={NEW_CUSTOMER}>+ Nuevo cliente...</option>}
-          </select>
+          <Controller
+            name="customerId"
+            control={control}
+            rules={{ required: true }}
+            render={({ field }) => (
+              <SearchSelect
+                id="customerId"
+                title="Buscar cliente"
+                searchPlaceholder="Nombre, razón social o CUIT..."
+                placeholder="Elegí un cliente..."
+                emptyText="No hay clientes que coincidan"
+                value={field.value}
+                onChange={field.onChange}
+                options={customerOptions}
+                extraOptions={canManageData ? [{ value: NEW_CUSTOMER, label: '+ Nuevo cliente...' }] : []}
+                hasError={Boolean(errors.customerId)}
+              />
+            )}
+          />
         </div>
 
         {isNewCustomer && (
@@ -420,26 +449,33 @@ const Orders = () => {
             const shortfall = rowProductId && !isNewProduct ? getShortfall(rowProductId) : 0;
             const rowProduct = products.find((p) => p.id === rowProductId);
             const rowQuantity = Number(watchedItems?.[index]?.quantity) || 0;
-            const productField = register(`items.${index}.productId`, { required: true });
 
             return (
               <div key={field.id} className="purchase-item-row">
                 <div className="field">
                   <label htmlFor={`order-item-product-${index}`}>Producto</label>
-                  <select
-                    id={`order-item-product-${index}`}
-                    {...productField}
-                    onChange={(e) => {
-                      productField.onChange(e);
-                      onProductChange(index, e.target.value);
-                    }}
-                  >
-                    <option value="">Producto...</option>
-                    {products.map((p) => (
-                      <option key={p.id} value={p.id}>{p.name} (stock: {p.stock})</option>
-                    ))}
-                    {canManageData && <option value={NEW_PRODUCT}>+ Nuevo producto...</option>}
-                  </select>
+                  <Controller
+                    name={`items.${index}.productId`}
+                    control={control}
+                    rules={{ required: true }}
+                    render={({ field: productField }) => (
+                      <SearchSelect
+                        id={`order-item-product-${index}`}
+                        title="Buscar producto"
+                        searchPlaceholder="Nombre, código, marca o modelo..."
+                        placeholder="Producto..."
+                        emptyText="No hay productos que coincidan"
+                        value={productField.value}
+                        onChange={(value) => {
+                          productField.onChange(value);
+                          onProductChange(index, value);
+                        }}
+                        options={productOptions}
+                        extraOptions={canManageData ? [{ value: NEW_PRODUCT, label: '+ Nuevo producto...' }] : []}
+                        hasError={Boolean(errors.items?.[index]?.productId)}
+                      />
+                    )}
+                  />
                 </div>
                 <div className="field">
                   <label htmlFor={`order-item-quantity-${index}`}>Cantidad</label>
@@ -490,7 +526,7 @@ const Orders = () => {
                       />
                     </div>
                     <div className="field">
-                      <label htmlFor={`new-product-name-${index}`}>Nombre</label>
+                      <label htmlFor={`new-product-name-${index}`}>Producto</label>
                       <input
                         id={`new-product-name-${index}`}
                         placeholder="Ej: Cerveza IPA 500ml"
@@ -508,13 +544,22 @@ const Orders = () => {
                       />
                     </div>
                     <div className="field">
-                      <label htmlFor={`new-product-vat-${index}`}>Alícuota de IVA (%)</label>
-                      <input
+                      <label htmlFor={`new-product-vat-${index}`}>IVA</label>
+                      <VatSelect
                         id={`new-product-vat-${index}`}
+                        registration={register(`items.${index}.newProduct.vatRate`)}
+                      />
+                    </div>
+                    <div className="field">
+                      <label htmlFor={`new-product-internal-${index}`}>Impuestos internos (%) <small>(opcional)</small></label>
+                      <input
+                        id={`new-product-internal-${index}`}
                         type="number"
                         step="0.01"
-                        placeholder="Ej: 21"
-                        {...register(`items.${index}.newProduct.vatRate`)}
+                        min="0"
+                        max="100"
+                        placeholder="Ej: 8"
+                        {...register(`items.${index}.newProduct.otherTaxes`)}
                       />
                     </div>
                     <div className="field">
@@ -568,6 +613,7 @@ const Orders = () => {
             <>
               <div>Subtotal: ${subtotal.toFixed(2)}</div>
               <div>IVA: ${vatAmount.toFixed(2)}</div>
+              {internalTaxAmount > 0 && <div>Impuestos internos: ${internalTaxAmount.toFixed(2)}</div>}
               <div>Total: ${total.toFixed(2)}</div>
             </>
           ) : (

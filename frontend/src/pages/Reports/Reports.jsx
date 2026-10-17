@@ -213,17 +213,23 @@ function PaymentsView({ data, range }) {
 }
 
 function VatView({ data, range }) {
+  const { discriminated, notDiscriminated } = data;
+  // La columna de impuestos internos aparece solo si hay alguno en el período
+  const showInternal = Number(discriminated.internal) > 0 || data.byRate.some((r) => Number(r.internal) > 0);
   const exportCsv = () => downloadCsv(
     `iva-ventas_${range.from}_${range.to}.csv`,
-    ['Alícuota %', 'Neto', 'IVA', 'Total'],
-    data.byRate.map((r) => [r.rate, r.net, r.vat, r.total]),
+    showInternal
+      ? ['Alícuota %', 'Neto', 'IVA', 'Impuestos internos', 'Total']
+      : ['Alícuota %', 'Neto', 'IVA', 'Total'],
+    data.byRate.map((r) => (showInternal
+      ? [r.rate, r.net, r.vat, r.internal, r.total]
+      : [r.rate, r.net, r.vat, r.total])),
   );
-  const { discriminated, notDiscriminated } = data;
   return (
     <>
       <p className="report-note">
         Es un apoyo para tu contador, no un libro de IVA oficial. Solo se discrimina el IVA en los remitos a
-        Responsables Inscriptos; el desglose por alícuota usa la alícuota actual de cada producto.
+        Responsables Inscriptos; el desglose por alícuota usa la alícuota actual de cada producto (IVA e impuestos internos).
       </p>
       <div className="stat-cards">
         <div className="stat-card">
@@ -232,6 +238,9 @@ function VatView({ data, range }) {
         </div>
         <div className="stat-card"><span>Neto gravado</span><strong>{money(discriminated.net)}</strong></div>
         <div className="stat-card"><span>IVA de ventas</span><strong>{money(discriminated.vat)}</strong></div>
+        {showInternal && (
+          <div className="stat-card"><span>Impuestos internos</span><strong>{money(discriminated.internal)}</strong></div>
+        )}
         <div className="stat-card">
           <span>Remitos sin discriminar</span><strong>{int(notDiscriminated.orders)}</strong>
           <small>Total: {money(notDiscriminated.total)}</small>
@@ -239,12 +248,14 @@ function VatView({ data, range }) {
       </div>
       <div className="report-actions"><ExportButton onClick={exportCsv} disabled={!data.byRate.length} /></div>
       <table className="report-table">
-        <thead><tr><th className="num">Alícuota</th><th className="num">Neto</th><th className="num">IVA</th><th className="num">Total</th></tr></thead>
+        <thead><tr><th className="num">Alícuota</th><th className="num">Neto</th><th className="num">IVA</th>{showInternal && <th className="num">Imp. internos</th>}<th className="num">Total</th></tr></thead>
         <tbody>
           {data.byRate.map((r) => (
             <tr key={r.rate}>
               <td className="num">{r.rate}%</td><td className="num">{money(r.net)}</td>
-              <td className="num">{money(r.vat)}</td><td className="num">{money(r.total)}</td>
+              <td className="num">{money(r.vat)}</td>
+              {showInternal && <td className="num">{money(r.internal)}</td>}
+              <td className="num">{money(r.total)}</td>
             </tr>
           ))}
         </tbody>

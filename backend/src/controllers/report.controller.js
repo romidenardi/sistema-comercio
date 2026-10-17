@@ -5,6 +5,7 @@ import {
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { httpError } from '../utils/httpError.js';
 import { round2 } from '../utils/numbers.js';
+import { splitPrice } from '../utils/taxes.js';
 
 const { Op } = pkg;
 
@@ -52,7 +53,6 @@ const readRange = (query) => {
   return { from, to, start, end };
 };
 
-// Los remitos anulados nunca cuentan
 const loadOrders = (businessId, start, end) =>
   Order.findAll({
     where: { businessId, status: 'active', date: { [Op.gte]: start, [Op.lt]: end } },
@@ -89,7 +89,7 @@ const loadProductsMap = async (businessId, ids) => {
   if (!ids.length) return new Map();
   const products = await Product.findAll({
     where: { businessId, id: { [Op.in]: ids } },
-    attributes: ['id', 'name', 'internalCode', 'categoryId', 'vatRate'],
+    attributes: ['id', 'name', 'internalCode', 'categoryId', 'vatRate', 'otherTaxes'],
   });
   return new Map(products.map((p) => [p.id, p]));
 };
@@ -269,7 +269,7 @@ export const vatReport = asyncHandler(async (req, res) => {
   const productIds = [...new Set(orders.flatMap((o) => o.items.map((i) => i.productId)))];
   const products = await loadProductsMap(businessId, productIds);
 
-  const discriminated = { orders: 0, net: 0, vat: 0, total: 0 };
+  const discriminated = { orders: 0, net: 0, vat: 0, internal: 0, total: 0 };
   const notDiscriminated = { orders: 0, total: 0 };
   const byRate = new Map();
 
@@ -283,17 +283,20 @@ export const vatReport = asyncHandler(async (req, res) => {
     discriminated.orders += 1;
     discriminated.net += Number(order.subtotal) || 0;
     discriminated.vat += Number(order.vatAmount) || 0;
+    discriminated.internal += Number(order.internalTaxAmount) || 0;
     discriminated.total += Number(order.total);
 
     // Desglose por alícuota, con la misma fórmula con que se calculó el remito
     const scale = orderScale(order);
     for (const item of order.items) {
-      const rate = Number(products.get(item.productId)?.vatRate) || 0;
+      const product = products.get(item.productId);
+      const rate = Number(product?.vatRate) || 0;
       const itemTotal = Number(item.quantity) * Number(item.unitPrice) * scale;
-      const net = rate > 0 ? itemTotal / (1 + rate / 100) : itemTotal;
-      const row = byRate.get(rate) || { rate, net: 0, vat: 0, total: 0 };
+      const { net, vat, internal } = splitPrice(itemTotal, rate, product?.otherTaxes);
+      const row = byRate.get(rate) || { rate, net: 0, vat: 0, internal: 0, total: 0 };
       row.net += net;
-      row.vat += itemTotal - net;
+      row.vat += vat;
+      row.internal += internal;
       row.total += itemTotal;
       byRate.set(rate, row);
     }
@@ -305,6 +308,7 @@ export const vatReport = asyncHandler(async (req, res) => {
       orders: discriminated.orders,
       net: round2(discriminated.net),
       vat: round2(discriminated.vat),
+      internal: round2(discriminated.internal),
       total: round2(discriminated.total),
     },
     notDiscriminated: {
@@ -312,7 +316,7 @@ export const vatReport = asyncHandler(async (req, res) => {
       total: round2(notDiscriminated.total),
     },
     byRate: [...byRate.values()]
-      .map((r) => ({ rate: r.rate, net: round2(r.net), vat: round2(r.vat), total: round2(r.total) }))
+      .map((r) => ({ rate: r.rate, net: round2(r.net), vat: round2(r.vat), internal: round2(r.internal), total: round2(r.total) }))
       .sort((a, b) => b.rate - a.rate),
   });
 });

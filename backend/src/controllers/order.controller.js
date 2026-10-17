@@ -3,6 +3,7 @@ import {
 } from '../models/index.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { httpError } from '../utils/httpError.js';
+import { splitPrice } from '../utils/taxes.js';
 import { isPositiveInt, isNonNegative, toNumber, toNumberOrZero, round2 } from '../utils/numbers.js';
 
 const FISCAL_CONDITIONS_WITH_VAT_BREAKDOWN = ['Responsable Inscripto'];
@@ -116,14 +117,15 @@ export const createOrder = asyncHandler(async (req, res) => {
 
     let grossSubtotal = 0;
     let grossVat = 0;
+    let grossInternal = 0;
     let grossTotal = 0;
     for (const row of rows) {
       const { product } = stockPlan.get(row.productId);
       const itemTotal = row.quantity * row.unitPrice;
-      const vatRate = Number(product.vatRate) || 0;
-      const itemNet = vatRate > 0 ? itemTotal / (1 + vatRate / 100) : itemTotal;
-      grossSubtotal += itemNet;
-      grossVat += itemTotal - itemNet;
+      const { net, vat, internal } = splitPrice(itemTotal, product.vatRate, product.otherTaxes);
+      grossSubtotal += net;
+      grossVat += vat;
+      grossInternal += internal;
       grossTotal += itemTotal;
     }
 
@@ -136,6 +138,8 @@ export const createOrder = asyncHandler(async (req, res) => {
     const scale = grossTotal > 0 ? total / grossTotal : 1;
     const subtotal = discriminatesVat ? round2(grossSubtotal * scale) : null;
     const vatAmount = discriminatesVat ? round2(grossVat * scale) : null;
+    // Los impuestos internos se discriminan junto con el IVA, solo para quienes lo reciben discriminado
+    const internalTaxAmount = discriminatesVat ? round2(grossInternal * scale) : null;
 
     let installmentsCount = null;
     let interestRate = null;
@@ -159,6 +163,7 @@ export const createOrder = asyncHandler(async (req, res) => {
       total,
       subtotal,
       vatAmount,
+      internalTaxAmount,
       discriminatesVat,
       installmentsCount,
       interestRate,

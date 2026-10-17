@@ -95,6 +95,9 @@ const OrderPrint = () => {
             <>
               <p>Subtotal: ${Number(order.subtotal).toFixed(2)}</p>
               <p>IVA: ${Number(order.vatAmount).toFixed(2)}</p>
+              {Number(order.internalTaxAmount) > 0 && (
+                <p>Impuestos internos: ${Number(order.internalTaxAmount).toFixed(2)}</p>
+              )}
               <p><strong>Total: ${Number(order.total).toFixed(2)}</strong></p>
             </>
           ) : (

@@ -5,7 +5,6 @@ import { httpError } from '../utils/httpError.js';
 
 const { Op } = pkg;
 
-// Vacío o solo espacios -> null; si no viene el campo -> undefined
 const cleanBarcode = (value) => {
   if (value === undefined) return undefined;
   const code = String(value ?? '').trim();
@@ -22,12 +21,37 @@ const assertBarcodeFree = async (businessId, barcode, exceptId) => {
   }
 };
 
-// Respaldo: si dos personas guardan a la vez, el índice único de la base lo frena
 const rethrowDuplicate = (err) => {
   if (err?.name === 'SequelizeUniqueConstraintError') {
     throw httpError('Ese código de barras ya está asignado a otro producto', 409);
   }
   throw err;
+};
+
+const ALLOWED_VAT_RATES = [0, 10.5, 21];
+
+const normalizeTaxes = (data, currentVat) => {
+  if ('vatRate' in data && data.vatRate !== undefined && data.vatRate !== null && data.vatRate !== '') {
+    const rate = Number(data.vatRate);
+    const unchanged = currentVat !== undefined && Number(currentVat) === rate;
+    if (!Number.isFinite(rate) || (!ALLOWED_VAT_RATES.includes(rate) && !unchanged)) {
+      throw httpError('El IVA debe ser 21%, 10,5% o 0%');
+    }
+    data.vatRate = rate;
+  }
+
+  if ('otherTaxes' in data) {
+    if (data.otherTaxes === '' || data.otherTaxes === null || data.otherTaxes === undefined) {
+      data.otherTaxes = null;
+    } else {
+      const internal = Number(data.otherTaxes);
+      if (!Number.isFinite(internal) || internal < 0 || internal > 100) {
+        throw httpError('Los impuestos internos deben ser un porcentaje entre 0 y 100');
+      }
+      data.otherTaxes = internal;
+    }
+  }
+  return data;
 };
 
 const findOwnProduct = async (id, businessId) => {
@@ -55,9 +79,11 @@ export const createProduct = asyncHandler(async (req, res) => {
   const barcode = cleanBarcode(req.body.barcode) ?? null;
   await assertBarcodeFree(businessId, barcode);
 
+  const data = normalizeTaxes({ ...req.body });
+
   let product;
   try {
-    product = await Product.create({ ...req.body, barcode, businessId });
+    product = await Product.create({ ...data, barcode, businessId });
   } catch (err) {
     rethrowDuplicate(err);
   }
@@ -70,6 +96,8 @@ export const updateProduct = asyncHandler(async (req, res) => {
 
   // Nunca se permite cambiar el comercio ni el id desde el pedido
   const { businessId: _ignoredBusiness, id: _ignoredId, ...data } = req.body;
+
+  normalizeTaxes(data, product.vatRate);
 
   if ('barcode' in data) {
     data.barcode = cleanBarcode(data.barcode) ?? null;

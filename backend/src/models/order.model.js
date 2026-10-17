@@ -64,6 +64,11 @@ const Order = sequelize.define('Order', {
     allowNull: true,
     field: 'vat_amount',
   },
+  internalTaxAmount: {
+    type: DataTypes.DECIMAL(12, 2),
+    allowNull: true,
+    field: 'internal_tax_amount',
+  },
   discriminatesVat: {
     type: DataTypes.BOOLEAN,
     allowNull: false,

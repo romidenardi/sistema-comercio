@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useForm, useFieldArray } from 'react-hook-form';
+import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { getPurchases, createPurchase } from '../../api/purchases.api.js';
 import { getSuppliers, createSupplier } from '../../api/suppliers.api.js';
 import { getProducts, createProduct } from '../../api/products.api.js';
@@ -7,6 +7,9 @@ import { useToast } from '../../context/ToastContext.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
 import Spinner from '../../components/common/Spinner.jsx';
 import ScanBar from '../../components/common/ScanBar.jsx';
+import SearchSelect from '../../components/common/SearchSelect.jsx';
+import VatSelect from '../../components/common/VatSelect.jsx';
+import { toPercentOrNull } from '../../utils/taxes.js';
 
 const NEW_SUPPLIER = '__new_supplier__';
 const NEW_PRODUCT = '__new_product__';
@@ -15,7 +18,7 @@ const emptyItem = () => ({
   productId: '',
   quantity: 1,
   unitCost: 0,
-  newProduct: { internalCode: '', barcode: '', name: '', price: '', vatRate: 21, unitType: 'unit' },
+  newProduct: { internalCode: '', barcode: '', name: '', price: '', vatRate: '21', otherTaxes: '', unitType: 'unit' },
 });
 
 const emptyForm = () => ({
@@ -34,7 +37,7 @@ const Purchases = () => {
   const { role } = useAuth();
   const canManageData = role === 'admin' || role === 'editor';
 
-  const { register, control, handleSubmit, reset, watch, setValue } = useForm({
+  const { register, control, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm({
     defaultValues: emptyForm(),
   });
 
@@ -70,7 +73,6 @@ const Purchases = () => {
     0
   );
 
-  // Código leído con el lector USB o con la cámara
   const handleScan = (rawCode) => {
     const code = String(rawCode || '').trim();
     if (!code) return;
@@ -123,7 +125,7 @@ const Purchases = () => {
         if (item.productId === NEW_PRODUCT) {
           const np = item.newProduct || {};
           if (!np.internalCode || !np.name) {
-            showToast('Completá código interno y nombre del producto nuevo', 'error');
+            showToast('Completá código interno y producto del producto nuevo', 'error');
             return;
           }
           if (!(Number(np.price) > 0)) {
@@ -161,10 +163,10 @@ const Purchases = () => {
             price: Number(np.price),
             cost: Number(item.unitCost) || 0,
             vatRate: np.vatRate === '' || np.vatRate === undefined ? 21 : Number(np.vatRate),
+            otherTaxes: toPercentOrNull(np.otherTaxes),
             unitType: np.unitType || 'unit',
           });
           productId = createdProduct.id;
-          // Si la compra falla más adelante, el producto queda elegido y no se vuelve a crear
           setProducts((prev) => [...prev, createdProduct]);
           setValue(`items.${i}.productId`, createdProduct.id);
         }
@@ -193,6 +195,19 @@ const Purchases = () => {
 
   const supplierName = (id) => suppliers.find((s) => s.id === id)?.name || '—';
 
+  const supplierOptions = suppliers.map((s) => ({
+    value: s.id,
+    label: s.name,
+    detail: s.cuit ? `CUIT ${s.cuit}` : '',
+    keywords: [s.cuit, s.email],
+  }));
+  const productOptions = products.map((p) => ({
+    value: p.id,
+    label: p.name,
+    detail: [p.internalCode && `Cód. ${p.internalCode}`, `Stock: ${p.stock}`].filter(Boolean).join(' · '),
+    keywords: [p.internalCode, p.barcode, p.brand, p.model],
+  }));
+
   if (loading) return <Spinner label="Cargando compras..." />;
 
   return (
@@ -202,13 +217,25 @@ const Purchases = () => {
       <form onSubmit={handleSubmit(onSubmit)} className="purchase-form">
         <div className="field">
           <label htmlFor="supplierId">Proveedor</label>
-          <select id="supplierId" {...register('supplierId', { required: true })}>
-            <option value="">Elegí un proveedor...</option>
-            {suppliers.map((s) => (
-              <option key={s.id} value={s.id}>{s.name}</option>
-            ))}
-            {canManageData && <option value={NEW_SUPPLIER}>+ Nuevo proveedor...</option>}
-          </select>
+          <Controller
+            name="supplierId"
+            control={control}
+            rules={{ required: true }}
+            render={({ field }) => (
+              <SearchSelect
+                id="supplierId"
+                title="Buscar proveedor"
+                searchPlaceholder="Nombre o CUIT..."
+                placeholder="Elegí un proveedor..."
+                emptyText="No hay proveedores que coincidan"
+                value={field.value}
+                onChange={field.onChange}
+                options={supplierOptions}
+                extraOptions={canManageData ? [{ value: NEW_SUPPLIER, label: '+ Nuevo proveedor...' }] : []}
+                hasError={Boolean(errors.supplierId)}
+              />
+            )}
+          />
         </div>
 
         {isNewSupplier && (
@@ -249,13 +276,25 @@ const Purchases = () => {
               <div key={field.id} className="purchase-item-row">
                 <div className="field">
                   <label htmlFor={`item-product-${index}`}>Producto</label>
-                  <select id={`item-product-${index}`} {...register(`items.${index}.productId`, { required: true })}>
-                    <option value="">Producto...</option>
-                    {products.map((p) => (
-                      <option key={p.id} value={p.id}>{p.name} ({p.internalCode})</option>
-                    ))}
-                    {canManageData && <option value={NEW_PRODUCT}>+ Nuevo producto...</option>}
-                  </select>
+                  <Controller
+                    name={`items.${index}.productId`}
+                    control={control}
+                    rules={{ required: true }}
+                    render={({ field }) => (
+                      <SearchSelect
+                        id={`item-product-${index}`}
+                        title="Buscar producto"
+                        searchPlaceholder="Nombre, código, marca o modelo..."
+                        placeholder="Producto..."
+                        emptyText="No hay productos que coincidan"
+                        value={field.value}
+                        onChange={field.onChange}
+                        options={productOptions}
+                        extraOptions={canManageData ? [{ value: NEW_PRODUCT, label: '+ Nuevo producto...' }] : []}
+                        hasError={Boolean(errors.items?.[index]?.productId)}
+                      />
+                    )}
+                  />
                 </div>
                 <div className="field">
                   <label htmlFor={`item-quantity-${index}`}>Cantidad</label>
@@ -306,7 +345,7 @@ const Purchases = () => {
                       />
                     </div>
                     <div className="field">
-                      <label htmlFor={`new-product-name-${index}`}>Nombre</label>
+                      <label htmlFor={`new-product-name-${index}`}>Producto</label>
                       <input
                         id={`new-product-name-${index}`}
                         placeholder="Ej: Cerveza IPA 500ml"
@@ -324,13 +363,22 @@ const Purchases = () => {
                       />
                     </div>
                     <div className="field">
-                      <label htmlFor={`new-product-vat-${index}`}>Alícuota de IVA (%)</label>
-                      <input
+                      <label htmlFor={`new-product-vat-${index}`}>IVA</label>
+                      <VatSelect
                         id={`new-product-vat-${index}`}
+                        registration={register(`items.${index}.newProduct.vatRate`)}
+                      />
+                    </div>
+                    <div className="field">
+                      <label htmlFor={`new-product-internal-${index}`}>Impuestos internos (%) <small>(opcional)</small></label>
+                      <input
+                        id={`new-product-internal-${index}`}
                         type="number"
                         step="0.01"
-                        placeholder="Ej: 21"
-                        {...register(`items.${index}.newProduct.vatRate`)}
+                        min="0"
+                        max="100"
+                        placeholder="Ej: 8"
+                        {...register(`items.${index}.newProduct.otherTaxes`)}
                       />
                     </div>
                     <div className="field">
