@@ -20,7 +20,6 @@
 
   --font-sans: 'DM Sans', system-ui, sans-serif;
   --font-display: 'Plus Jakarta Sans', 'DM Sans', system-ui, sans-serif;
-  --font-mono: 'DM Mono', 'Courier New', monospace;
 
   --radius: 6px;
   --radius-lg: 8px;
@@ -229,7 +228,7 @@ textarea:focus {
 }
 
 input[type="number"] {
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   min-width: 110px;
 }
 
@@ -391,7 +390,7 @@ tbody td:last-child {
 /* columnas numéricas: precio, stock, códigos */
 td:nth-child(1),
 .stock-panel td:nth-child(3) {
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 13px;
 }
 
@@ -522,7 +521,7 @@ td:nth-child(1),
 }
 
 .stock-panel h3 {
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
 }
 
 .stock-panel form {
@@ -545,7 +544,7 @@ td:nth-child(1),
 }
 
 .not-found-page h1 {
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 48px;
   color: var(--color-primary);
 }
@@ -575,7 +574,7 @@ td:nth-child(1),
 
 .purchase-total {
   width: 100%;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-weight: 500;
   text-align: right;
   padding: 8px 0;
@@ -696,7 +695,7 @@ td:nth-child(1),
 
 .print-total {
   text-align: right;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-weight: 600;
   font-size: 18px;
   padding: 12px 0;
