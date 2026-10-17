@@ -3,6 +3,8 @@ import { useForm } from 'react-hook-form';
 import { useResource } from '../../hooks/useResource.js';
 import * as customersApi from '../../api/customers.api.js';
 import Spinner from '../../components/common/Spinner.jsx';
+import SearchInput from '../../components/common/SearchInput.jsx';
+import { matchesSearch } from '../../utils/search.js';
 
 const api = {
   getAll: customersApi.getCustomers,
@@ -17,6 +19,7 @@ const Customers = () => {
   const { items: customers, loading, create, update, remove } = useResource(api);
   const [editingId, setEditingId] = useState(null);
   const [personType, setPersonType] = useState('individual');
+  const [search, setSearch] = useState('');
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm();
   const editForm = useForm();
@@ -78,6 +81,11 @@ const Customers = () => {
   };
 
   const displayName = (c) => c.businessName || `${c.firstName} ${c.lastName || ''}`.trim();
+
+  // La fila que se está editando sigue visible aunque el filtro no la incluya
+  const visibleCustomers = customers.filter((c) => c.id === editingId || matchesSearch(search, [
+    c.businessName, c.firstName, c.lastName, c.cuit, c.city, c.province, c.fiscalCondition, c.phone, c.email,
+  ]));
 
   if (loading) return <Spinner label="Cargando clientes..." />;
 
@@ -168,6 +176,14 @@ const Customers = () => {
         <button type="submit">Agregar cliente</button>
       </form>
 
+      <SearchInput
+        id="customer-search"
+        label="Buscar clientes"
+        placeholder="Buscar por nombre, razón social, CUIT, localidad..."
+        value={search}
+        onChange={setSearch}
+      />
+
       <div className="table-wrapper">
         <table>
           <thead>
@@ -180,7 +196,14 @@ const Customers = () => {
             </tr>
           </thead>
           <tbody>
-            {customers.map((customer) => (
+            {visibleCustomers.length === 0 && (
+              <tr>
+                <td colSpan={5} className="list-search-empty">
+                  {search ? 'No hay clientes que coincidan con la búsqueda' : 'Todavía no hay clientes'}
+                </td>
+              </tr>
+            )}
+            {visibleCustomers.map((customer) => (
               <tr key={customer.id}>
                 {editingId === customer.id ? (
                   <td colSpan={5} className="edit-cell">

@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@600;700&display=swap');
 
 :root {
   --color-bg: #F4F7FA;
@@ -18,8 +18,9 @@
   --color-warning-bg: #FFF4E5;
   --color-warning-border: #F0C27A;
 
-  --font-sans: 'IBM Plex Sans', system-ui, sans-serif;
-  --font-mono: 'IBM Plex Mono', 'Courier New', monospace;
+  --font-sans: 'DM Sans', system-ui, sans-serif;
+  --font-display: 'Plus Jakarta Sans', 'DM Sans', system-ui, sans-serif;
+  --font-mono: 'DM Mono', 'Courier New', monospace;
 
   --radius: 6px;
   --radius-lg: 8px;
@@ -43,7 +44,8 @@ body {
 h1,
 h2,
 h3 {
-  font-weight: 600;
+  font-family: var(--font-display);
+  font-weight: 700;
   line-height: 1.25;
   margin: 0 0 1rem;
 }
@@ -90,8 +92,9 @@ a {
 
 .sidebar-brand span {
   color: var(--color-on-primary);
+  font-family: var(--font-display);
   font-size: 18px;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .sidebar-logo {

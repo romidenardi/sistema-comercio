@@ -3,6 +3,8 @@ import { useForm } from 'react-hook-form';
 import { useResource } from '../../hooks/useResource.js';
 import * as suppliersApi from '../../api/suppliers.api.js';
 import Spinner from '../../components/common/Spinner.jsx';
+import SearchInput from '../../components/common/SearchInput.jsx';
+import { matchesSearch } from '../../utils/search.js';
 
 const api = {
   getAll: suppliersApi.getSuppliers,
@@ -14,6 +16,7 @@ const api = {
 const Suppliers = () => {
   const { items: suppliers, loading, create, update, remove } = useResource(api);
   const [editingId, setEditingId] = useState(null);
+  const [search, setSearch] = useState('');
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm();
   const editForm = useForm();
@@ -45,6 +48,11 @@ const Suppliers = () => {
   const onDelete = (id) => {
     if (confirm('¿Eliminar este proveedor?')) remove(id);
   };
+
+  // La fila que se está editando sigue visible aunque el filtro no la incluya
+  const visibleSuppliers = suppliers.filter((s) => s.id === editingId || matchesSearch(search, [
+    s.name, s.cuit, s.contactPerson, s.phone, s.email, s.city, s.province,
+  ]));
 
   if (loading) return <Spinner label="Cargando proveedores..." />;
 
@@ -97,6 +105,14 @@ const Suppliers = () => {
         <button type="submit">Agregar proveedor</button>
       </form>
 
+      <SearchInput
+        id="supplier-search"
+        label="Buscar proveedores"
+        placeholder="Buscar por nombre, CUIT, contacto, teléfono o localidad..."
+        value={search}
+        onChange={setSearch}
+      />
+
       <div className="table-wrapper">
         <table>
           <thead>
@@ -109,7 +125,14 @@ const Suppliers = () => {
             </tr>
           </thead>
           <tbody>
-            {suppliers.map((supplier) => (
+            {visibleSuppliers.length === 0 && (
+              <tr>
+                <td colSpan={5} className="list-search-empty">
+                  {search ? 'No hay proveedores que coincidan con la búsqueda' : 'Todavía no hay proveedores'}
+                </td>
+              </tr>
+            )}
+            {visibleSuppliers.map((supplier) => (
               <tr key={supplier.id}>
                 {editingId === supplier.id ? (
                   <td colSpan={5} className="edit-cell">

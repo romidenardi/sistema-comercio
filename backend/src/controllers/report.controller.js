@@ -53,6 +53,7 @@ const readRange = (query) => {
   return { from, to, start, end };
 };
 
+// Los remitos anulados nunca cuentan
 const loadOrders = (businessId, start, end) =>
   Order.findAll({
     where: { businessId, status: 'active', date: { [Op.gte]: start, [Op.lt]: end } },
@@ -272,6 +273,7 @@ export const vatReport = asyncHandler(async (req, res) => {
   const discriminated = { orders: 0, net: 0, vat: 0, internal: 0, total: 0 };
   const notDiscriminated = { orders: 0, total: 0 };
   const byRate = new Map();
+  const byInternalRate = new Map();
 
   for (const order of orders) {
     if (!order.discriminatesVat) {
@@ -299,6 +301,15 @@ export const vatReport = asyncHandler(async (req, res) => {
       row.internal += internal;
       row.total += itemTotal;
       byRate.set(rate, row);
+
+      const internalRate = Number(product?.otherTaxes) || 0;
+      if (internalRate > 0) {
+        const internalRow = byInternalRate.get(internalRate) || { rate: internalRate, net: 0, internal: 0, total: 0 };
+        internalRow.net += net;
+        internalRow.internal += internal;
+        internalRow.total += itemTotal;
+        byInternalRate.set(internalRate, internalRow);
+      }
     }
   }
 
@@ -317,6 +328,9 @@ export const vatReport = asyncHandler(async (req, res) => {
     },
     byRate: [...byRate.values()]
       .map((r) => ({ rate: r.rate, net: round2(r.net), vat: round2(r.vat), internal: round2(r.internal), total: round2(r.total) }))
+      .sort((a, b) => b.rate - a.rate),
+    byInternalRate: [...byInternalRate.values()]
+      .map((r) => ({ rate: r.rate, net: round2(r.net), internal: round2(r.internal), total: round2(r.total) }))
       .sort((a, b) => b.rate - a.rate),
   });
 });

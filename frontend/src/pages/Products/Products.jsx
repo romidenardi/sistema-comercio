@@ -6,6 +6,8 @@ import { getCategories } from '../../api/categories.api.js';
 import StockMovementPanel from '../../components/common/StockMovementPanel.jsx';
 import BarcodeScanner from '../../components/common/BarcodeScanner.jsx';
 import Spinner from '../../components/common/Spinner.jsx';
+import SearchInput from '../../components/common/SearchInput.jsx';
+import { matchesSearch } from '../../utils/search.js';
 import VatSelect from '../../components/common/VatSelect.jsx';
 import { toPercentOrNull, vatToFormValue } from '../../utils/taxes.js';
 
@@ -21,14 +23,14 @@ const Products = () => {
   const [categories, setCategories] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [stockPanelId, setStockPanelId] = useState(null);
+  const [search, setSearch] = useState('');
 
   const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm({
     defaultValues: { unitType: 'unit', vatRate: '21' },
   });
   const editForm = useForm();
-  const [scanTarget, setScanTarget] = useState(null); // 'create' | 'edit' | null
+  const [scanTarget, setScanTarget] = useState(null); 
 
-  // Los lectores mandan Enter al terminar: no debe enviar el formulario
   const blockEnter = (e) => {
     if (e.key === 'Enter') e.preventDefault();
   };
@@ -99,6 +101,10 @@ const Products = () => {
 
   const categoryName = (categoryId) =>
     flatCategories.find((c) => c.id === categoryId)?.name || '—';
+
+  const visibleProducts = products.filter((p) => p.id === editingId || matchesSearch(search, [
+    p.name, p.internalCode, p.barcode, p.brand, p.model, categoryName(p.categoryId),
+  ]));
 
   if (loading) return <Spinner label="Cargando productos..." />;
 
@@ -212,6 +218,14 @@ const Products = () => {
         <button type="submit">Agregar producto</button>
       </form>
 
+      <SearchInput
+        id="product-search"
+        label="Buscar productos"
+        placeholder="Buscar por producto, código, marca, modelo o categoría..."
+        value={search}
+        onChange={setSearch}
+      />
+
       <div className="table-wrapper">
         <table>
           <thead>
@@ -227,7 +241,14 @@ const Products = () => {
             </tr>
           </thead>
           <tbody>
-            {products.map((product) => (
+            {visibleProducts.length === 0 && (
+              <tr>
+                <td colSpan={8} className="list-search-empty">
+                  {search ? 'No hay productos que coincidan con la búsqueda' : 'Todavía no hay productos'}
+                </td>
+              </tr>
+            )}
+            {visibleProducts.map((product) => (
               <Fragment key={product.id}>
                 <tr>
                   {editingId === product.id ? (
