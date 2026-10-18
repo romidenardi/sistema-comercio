@@ -11,7 +11,7 @@ import Spinner from '../../components/common/Spinner.jsx';
 import ScanBar from '../../components/common/ScanBar.jsx';
 import SearchSelect from '../../components/common/SearchSelect.jsx';
 import VatSelect from '../../components/common/VatSelect.jsx';
-import { splitPrice, toPercentOrNull } from '../../utils/taxes.js';
+import { splitPrice, splitLineParts, toPercentOrNull } from '../../utils/taxes.js';
 
 const NEW_CUSTOMER = '__new__';
 const NEW_PRODUCT = '__new_product__';
@@ -84,14 +84,20 @@ const Orders = () => {
     loadAll();
   }, []);
 
-  // Al cambiar la forma de pago, reseteo el plan de cuotas elegido
   useEffect(() => {
     setValue('installmentPlanId', '');
   }, [selectedPaymentId, setValue]);
 
   const requestedByProduct = (watchedItems || []).reduce((acc, item) => {
-    if (item.productId && item.productId !== NEW_PRODUCT) {
-      acc[item.productId] = (acc[item.productId] || 0) + (Number(item.quantity) || 0);
+    if (!item.productId || item.productId === NEW_PRODUCT) return acc;
+    const quantity = Number(item.quantity) || 0;
+    const rowProduct = products.find((p) => p.id === item.productId);
+    if (rowProduct?.isCombo) {
+      (rowProduct.components || []).forEach((c) => {
+        acc[c.productId] = (acc[c.productId] || 0) + quantity * c.quantity;
+      });
+    } else {
+      acc[item.productId] = (acc[item.productId] || 0) + quantity;
     }
     return acc;
   }, {});
@@ -105,16 +111,22 @@ const Orders = () => {
   const { grossSubtotal, grossVat, grossInternal, grossTotal } = (watchedItems || []).reduce((acc, item) => {
     const isNew = item.productId === NEW_PRODUCT;
     const product = isNew ? null : products.find((p) => p.id === item.productId);
-    const vatRate = isNew ? item.newProduct?.vatRate : product?.vatRate;
-    const internalRate = isNew ? item.newProduct?.otherTaxes : product?.otherTaxes;
     const itemTotal = (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0);
-    const { net, vat, internal } = splitPrice(itemTotal, vatRate, internalRate);
-    return {
-      grossSubtotal: acc.grossSubtotal + net,
-      grossVat: acc.grossVat + vat,
-      grossInternal: acc.grossInternal + internal,
-      grossTotal: acc.grossTotal + itemTotal,
-    };
+
+    const parts = product?.isCombo && (product.components || []).length
+      ? splitLineParts(itemTotal, product.components)
+      : [splitPrice(
+        itemTotal,
+        isNew ? item.newProduct?.vatRate : product?.vatRate,
+        isNew ? item.newProduct?.otherTaxes : product?.otherTaxes
+      )];
+
+    return parts.reduce((sum, part) => ({
+      grossSubtotal: sum.grossSubtotal + part.net,
+      grossVat: sum.grossVat + part.vat,
+      grossInternal: sum.grossInternal + part.internal,
+      grossTotal: sum.grossTotal,
+    }), { ...acc, grossTotal: acc.grossTotal + itemTotal });
   }, { grossSubtotal: 0, grossVat: 0, grossInternal: 0, grossTotal: 0 });
 
   const discountPercent = Number(watchedDiscountPercent) || 0;
@@ -147,7 +159,6 @@ const Orders = () => {
     setValue(`items.${index}.addStock`, false);
   };
 
-  // Código leído con el lector USB o con la cámara
   const handleScan = (rawCode) => {
     const code = String(rawCode || '').trim();
     if (!code) return;
@@ -303,7 +314,8 @@ const Orders = () => {
   const productOptions = products.map((p) => ({
     value: p.id,
     label: p.name,
-    detail: [p.internalCode && `Cód. ${p.internalCode}`, `Stock: ${p.stock}`].filter(Boolean).join(' · '),
+    detail: [p.isCombo && 'Combo', p.internalCode && `Cód. ${p.internalCode}`, `Stock: ${p.stock}`]
+      .filter(Boolean).join(' · '),
     keywords: [p.internalCode, p.barcode, p.brand, p.model],
   }));
   const displayCustomer = (order) => (order.Customer ? customerLabel(order.Customer) : '—');
@@ -446,9 +458,11 @@ const Orders = () => {
           {fields.map((field, index) => {
             const rowProductId = watchedItems?.[index]?.productId;
             const isNewProduct = rowProductId === NEW_PRODUCT;
-            const shortfall = rowProductId && !isNewProduct ? getShortfall(rowProductId) : 0;
             const rowProduct = products.find((p) => p.id === rowProductId);
+            const isCombo = Boolean(rowProduct?.isCombo);
             const rowQuantity = Number(watchedItems?.[index]?.quantity) || 0;
+            const shortfall = rowProductId && !isNewProduct && !isCombo ? getShortfall(rowProductId) : 0;
+            const comboShortfall = isCombo ? Math.max(rowQuantity - Number(rowProduct.stock), 0) : 0;
 
             return (
               <div key={field.id} className="purchase-item-row">
@@ -575,6 +589,23 @@ const Orders = () => {
                         al generar el remito, se cargan al stock las {rowQuantity} unidades de esta fila.
                       </span>
                     </div>
+                  </div>
+                )}
+
+                {isCombo && (
+                  <div className="field field-full">
+                    <small>
+                      Incluye: {(rowProduct.components || []).map((c) => `${c.quantity}× ${c.name}`).join(', ')}
+                    </small>
+                  </div>
+                )}
+
+                {comboShortfall > 0 && (
+                  <div className="field field-full stock-warning">
+                    <span>
+                      Stock insuficiente para el combo {rowProduct.name}: se pueden armar {Number(rowProduct.stock)},
+                      pedís {rowQuantity}. Revisá el stock de los productos que lo forman.
+                    </span>
                   </div>
                 )}
 

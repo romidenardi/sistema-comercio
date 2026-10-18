@@ -3,7 +3,8 @@ import {
 } from '../models/index.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { httpError } from '../utils/httpError.js';
-import { splitPrice } from '../utils/taxes.js';
+import { splitPrice, splitLineParts } from '../utils/taxes.js';
+import { loadComboComponents } from '../services/combo.service.js';
 import { isPositiveInt, isNonNegative, toNumber, toNumberOrZero, round2 } from '../utils/numbers.js';
 
 const FISCAL_CONDITIONS_WITH_VAT_BREAKDOWN = ['Responsable Inscripto'];
@@ -82,11 +83,39 @@ export const createOrder = asyncHandler(async (req, res) => {
       if (!installmentPlan) throw httpError('Plan de cuotas no encontrado', 404);
     }
 
+    const rowProducts = await Product.findAll({
+      where: { id: [...new Set(rows.map((r) => r.productId))], businessId },
+      transaction: t,
+    });
+    const rowProductMap = new Map(rowProducts.map((p) => [p.id, p]));
+    for (const row of rows) {
+      if (!rowProductMap.has(row.productId)) throw httpError(`Producto no encontrado: ${row.productId}`, 404);
+    }
+    const comboComponents = await loadComboComponents(
+      rowProducts.filter((p) => p.isCombo).map((p) => p.id),
+      businessId,
+      t
+    );
+
     const requested = new Map();
     const addStockFor = new Set();
+    const viaCombo = new Set();
     for (const row of rows) {
-      requested.set(row.productId, (requested.get(row.productId) || 0) + row.quantity);
-      if (row.addStock) addStockFor.add(row.productId);
+      const rowProduct = rowProductMap.get(row.productId);
+      if (rowProduct.isCombo) {
+        const components = comboComponents.get(row.productId) || [];
+        if (!components.length) throw httpError(`El combo ${rowProduct.name} no tiene productos cargados`);
+        for (const component of components) {
+          requested.set(
+            component.productId,
+            (requested.get(component.productId) || 0) + row.quantity * component.quantity
+          );
+          viaCombo.add(component.productId);
+        }
+      } else {
+        requested.set(row.productId, (requested.get(row.productId) || 0) + row.quantity);
+        if (row.addStock) addStockFor.add(row.productId);
+      }
     }
 
     const stockPlan = new Map();
@@ -101,7 +130,8 @@ export const createOrder = asyncHandler(async (req, res) => {
       const shortfall = Math.max(qty - product.stock, 0);
       if (shortfall > 0) {
         if (!addStockFor.has(productId)) {
-          throw httpError(`Stock insuficiente para ${product.name} (disponible: ${product.stock}, pedido: ${qty})`);
+          const forCombo = viaCombo.has(productId) ? ' (necesario para un combo)' : '';
+          throw httpError(`Stock insuficiente para ${product.name}${forCombo} (disponible: ${product.stock}, pedido: ${qty})`);
         }
         if (!ROLES_THAT_CAN_ADD_STOCK.includes(role)) {
           throw httpError(
@@ -120,12 +150,28 @@ export const createOrder = asyncHandler(async (req, res) => {
     let grossInternal = 0;
     let grossTotal = 0;
     for (const row of rows) {
-      const { product } = stockPlan.get(row.productId);
       const itemTotal = row.quantity * row.unitPrice;
-      const { net, vat, internal } = splitPrice(itemTotal, product.vatRate, product.otherTaxes);
-      grossSubtotal += net;
-      grossVat += vat;
-      grossInternal += internal;
+      let parts;
+      if (rowProductMap.get(row.productId).isCombo) {
+        row.components = comboComponents.get(row.productId).map((c) => ({
+          productId: c.productId,
+          name: c.product.name,
+          internalCode: c.product.internalCode,
+          quantity: c.quantity,
+          price: Number(c.product.price) || 0,
+          vatRate: Number(c.product.vatRate) || 0,
+          otherTaxes: Number(c.product.otherTaxes) || 0,
+        }));
+        parts = splitLineParts(itemTotal, row.components);
+      } else {
+        const { product } = stockPlan.get(row.productId);
+        parts = [splitPrice(itemTotal, product.vatRate, product.otherTaxes)];
+      }
+      for (const part of parts) {
+        grossSubtotal += part.net;
+        grossVat += part.vat;
+        grossInternal += part.internal;
+      }
       grossTotal += itemTotal;
     }
 
@@ -138,7 +184,6 @@ export const createOrder = asyncHandler(async (req, res) => {
     const scale = grossTotal > 0 ? total / grossTotal : 1;
     const subtotal = discriminatesVat ? round2(grossSubtotal * scale) : null;
     const vatAmount = discriminatesVat ? round2(grossVat * scale) : null;
-    // Los impuestos internos se discriminan junto con el IVA, solo para quienes lo reciben discriminado
     const internalTaxAmount = discriminatesVat ? round2(grossInternal * scale) : null;
 
     let installmentsCount = null;
@@ -179,6 +224,7 @@ export const createOrder = asyncHandler(async (req, res) => {
         productId: row.productId,
         quantity: row.quantity,
         unitPrice: row.unitPrice,
+        components: row.components || null,
       }, { transaction: t });
     }
 
@@ -199,7 +245,7 @@ export const createOrder = asyncHandler(async (req, res) => {
         productId: product.id,
         type: 'out',
         quantity: -qty,
-        reason: `Remito a cliente ${customerName}`,
+        reason: `Remito a cliente ${customerName}${viaCombo.has(product.id) ? ' (incluye combos)' : ''}`,
       }, { transaction: t });
 
       product.stock = product.stock + shortfall - qty;

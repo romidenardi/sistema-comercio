@@ -27,6 +27,10 @@ const OrderItem = sequelize.define('OrderItem', {
     allowNull: false,
     field: 'unit_price',
   },
+  components: {
+    type: DataTypes.JSON,
+    allowNull: true,
+  },
 }, {
   tableName: 'order_items',
 });

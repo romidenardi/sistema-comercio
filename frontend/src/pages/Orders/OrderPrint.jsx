@@ -68,7 +68,14 @@ const OrderPrint = () => {
           <tbody>
             {order.items.map((item) => (
               <tr key={item.id}>
-                <td>{item.Product?.name}</td>
+                <td>
+                  {item.Product?.name}
+                  {Array.isArray(item.components) && item.components.length > 0 && (
+                    <small style={{ display: 'block' }}>
+                      Incluye: {item.components.map((c) => `${c.quantity}× ${c.name}`).join(', ')}
+                    </small>
+                  )}
+                </td>
                 <td>{item.quantity}</td>
                 <td>${Number(item.unitPrice).toFixed(2)}</td>
                 <td>${(item.quantity * item.unitPrice).toFixed(2)}</td>

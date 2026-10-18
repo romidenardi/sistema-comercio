@@ -88,6 +88,17 @@ const Product = sequelize.define('Product', {
     allowNull: false,
     defaultValue: true,
   },
+  isCombo: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: false,
+    field: 'is_combo',
+  },
+  specialPrice: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: true,
+    field: 'special_price',
+  },
   
 }, {
   tableName: 'products',

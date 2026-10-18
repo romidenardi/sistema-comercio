@@ -7,6 +7,7 @@ import StockMovementPanel from '../../components/common/StockMovementPanel.jsx';
 import BarcodeScanner from '../../components/common/BarcodeScanner.jsx';
 import Spinner from '../../components/common/Spinner.jsx';
 import SearchInput from '../../components/common/SearchInput.jsx';
+import Combos from './Combos.jsx';
 import { matchesSearch } from '../../utils/search.js';
 import VatSelect from '../../components/common/VatSelect.jsx';
 import { toPercentOrNull, vatToFormValue } from '../../utils/taxes.js';
@@ -24,13 +25,15 @@ const Products = () => {
   const [editingId, setEditingId] = useState(null);
   const [stockPanelId, setStockPanelId] = useState(null);
   const [search, setSearch] = useState('');
+  const [tab, setTab] = useState('products'); // 'products' | 'combos'
 
   const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm({
     defaultValues: { unitType: 'unit', vatRate: '21' },
   });
   const editForm = useForm();
-  const [scanTarget, setScanTarget] = useState(null); 
+  const [scanTarget, setScanTarget] = useState(null); // 'create' | 'edit' | null
 
+  // Los lectores mandan Enter al terminar: no debe enviar el formulario
   const blockEnter = (e) => {
     if (e.key === 'Enter') e.preventDefault();
   };
@@ -102,15 +105,38 @@ const Products = () => {
   const categoryName = (categoryId) =>
     flatCategories.find((c) => c.id === categoryId)?.name || '—';
 
-  const visibleProducts = products.filter((p) => p.id === editingId || matchesSearch(search, [
+  // La fila que se está editando sigue visible aunque el filtro no la incluya
+  const visibleProducts = products.filter((p) => !p.isCombo && (p.id === editingId || matchesSearch(search, [
     p.name, p.internalCode, p.barcode, p.brand, p.model, categoryName(p.categoryId),
-  ]));
+  ])));
+
+  const tabs = (
+    <div className="report-tabs" role="tablist">
+      <button type="button" role="tab" aria-selected={tab === 'products'} className={tab === 'products' ? 'active' : ''} onClick={() => setTab('products')}>
+        Productos
+      </button>
+      <button type="button" role="tab" aria-selected={tab === 'combos'} className={tab === 'combos' ? 'active' : ''} onClick={() => setTab('combos')}>
+        Combos
+      </button>
+    </div>
+  );
 
   if (loading) return <Spinner label="Cargando productos..." />;
+
+  if (tab === 'combos') {
+    return (
+      <div className="products-page">
+        <h1>Productos</h1>
+        {tabs}
+        <Combos products={products} categories={flatCategories} onChanged={reload} />
+      </div>
+    );
+  }
 
   return (
     <div className="products-page">
       <h1>Productos</h1>
+      {tabs}
 
       <form onSubmit={handleSubmit(onCreate)} className="product-form">
         <div className="field">

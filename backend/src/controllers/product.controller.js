@@ -1,7 +1,8 @@
 import pkg from 'sequelize';
-import { Product } from '../models/index.js';
+import { Product, ComboItem } from '../models/index.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { httpError } from '../utils/httpError.js';
+import { withComboData } from '../services/combo.service.js';
 
 const { Op } = pkg;
 
@@ -61,8 +62,9 @@ const findOwnProduct = async (id, businessId) => {
 };
 
 export const getProducts = asyncHandler(async (req, res) => {
-  const products = await Product.findAll({ where: { businessId: req.user.businessId } });
-  res.json(products);
+  const { businessId } = req.user;
+  const products = await Product.findAll({ where: { businessId } });
+  res.json(await withComboData(products, businessId));
 });
 
 export const getProductByBarcode = asyncHandler(async (req, res) => {
@@ -71,7 +73,8 @@ export const getProductByBarcode = asyncHandler(async (req, res) => {
     ? await Product.findOne({ where: { barcode, businessId: req.user.businessId } })
     : null;
   if (!product) throw httpError('Producto no encontrado', 404);
-  res.json(product);
+  const [data] = await withComboData([product], req.user.businessId);
+  res.json(data);
 });
 
 export const createProduct = asyncHandler(async (req, res) => {
@@ -79,7 +82,9 @@ export const createProduct = asyncHandler(async (req, res) => {
   const barcode = cleanBarcode(req.body.barcode) ?? null;
   await assertBarcodeFree(businessId, barcode);
 
-  const data = normalizeTaxes({ ...req.body });
+  // Los combos se crean desde /combos: acá nunca
+  const { isCombo: _ignoredCombo, specialPrice: _ignoredSpecial, ...body } = req.body;
+  const data = normalizeTaxes({ ...body });
 
   let product;
   try {
@@ -95,7 +100,10 @@ export const updateProduct = asyncHandler(async (req, res) => {
   const product = await findOwnProduct(req.params.id, businessId);
 
   // Nunca se permite cambiar el comercio ni el id desde el pedido
-  const { businessId: _ignoredBusiness, id: _ignoredId, ...data } = req.body;
+  const {
+    businessId: _ignoredBusiness, id: _ignoredId, isCombo: _ignoredCombo, specialPrice: _ignoredSpecial, ...data
+  } = req.body;
+  if (product.isCombo) throw httpError('Los combos se editan desde la pestaña Combos', 400);
 
   normalizeTaxes(data, product.vatRate);
 
@@ -114,6 +122,17 @@ export const updateProduct = asyncHandler(async (req, res) => {
 
 export const deleteProduct = asyncHandler(async (req, res) => {
   const product = await findOwnProduct(req.params.id, req.user.businessId);
+  if (product.isCombo) throw httpError('Los combos se eliminan desde la pestaña Combos', 400);
+
+  const usedIn = await ComboItem.findAll({
+    where: { productId: product.id },
+    include: [{ model: Product, as: 'combo', attributes: ['name'] }],
+  });
+  if (usedIn.length) {
+    const names = usedIn.map((item) => `"${item.combo?.name}"`).join(', ');
+    throw httpError(`No se puede eliminar: forma parte de los combos ${names}`, 409);
+  }
+
   await product.destroy();
   res.status(204).send();
 });

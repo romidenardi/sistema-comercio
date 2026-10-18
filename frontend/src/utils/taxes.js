@@ -1,3 +1,4 @@
+// Alícuotas de IVA que se pueden elegir al cargar un producto
 export const VAT_OPTIONS = [
   { value: '21', label: '21%' },
   { value: '10.5', label: '10,5%' },
@@ -22,4 +23,17 @@ export const splitPrice = (total, vatRate, internalRate) => {
     vat: (net * vat) / 100,
     internal: (net * internal) / 100,
   };
+};
+
+export const splitLineParts = (itemTotal, components) => {
+  let weights = components.map((c) => (Number(c.price) || 0) * (Number(c.quantity) || 0));
+  let totalWeight = weights.reduce((sum, w) => sum + w, 0);
+  if (totalWeight <= 0) {
+    weights = components.map((c) => Number(c.quantity) || 1);
+    totalWeight = weights.reduce((sum, w) => sum + w, 0);
+  }
+  return components.map((c, index) => {
+    const total = totalWeight > 0 ? (itemTotal * weights[index]) / totalWeight : 0;
+    return { total, ...splitPrice(total, c.vatRate, c.otherTaxes) };
+  });
 };

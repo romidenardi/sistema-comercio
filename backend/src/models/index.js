@@ -12,6 +12,7 @@ import Purchase from './purchase.model.js';
 import PurchaseItem from './purchaseItem.model.js';
 import Order from './order.model.js';
 import OrderItem from './orderItem.model.js';
+import ComboItem from './comboItem.model.js';
 import PlatformAdmin from './platformAdmin.model.js'; 
 
 Business.hasMany(Category, { foreignKey: 'businessId' });
@@ -74,7 +75,13 @@ OrderItem.belongsTo(Order, { foreignKey: 'orderId' });
 Product.hasMany(OrderItem, { foreignKey: 'productId' });
 OrderItem.belongsTo(Product, { foreignKey: 'productId' });
 
+// Combos: un producto "combo" tiene componentes; un producto puede estar en varios combos
+Product.hasMany(ComboItem, { as: 'components', foreignKey: 'comboId', onDelete: 'CASCADE' });
+ComboItem.belongsTo(Product, { as: 'combo', foreignKey: 'comboId' });
+Product.hasMany(ComboItem, { as: 'usedInCombos', foreignKey: 'productId', onDelete: 'CASCADE' });
+ComboItem.belongsTo(Product, { as: 'product', foreignKey: 'productId' });
+
 export {
   sequelize, Business, Category, Product, StockMovement, Payment, InstallmentPlan,
-  User, Customer, Supplier, Purchase, PurchaseItem, Order, OrderItem, PlatformAdmin,
+  User, Customer, Supplier, Purchase, PurchaseItem, Order, OrderItem, ComboItem, PlatformAdmin,
 };

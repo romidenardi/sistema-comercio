@@ -73,13 +73,14 @@ const Purchases = () => {
     0
   );
 
+  // Código leído con el lector USB o con la cámara
   const handleScan = (rawCode) => {
     const code = String(rawCode || '').trim();
     if (!code) return;
 
     const items = watchedItems || [];
     const emptyIndex = items.findIndex((it) => !it.productId);
-    const product = products.find((p) => p.barcode === code || p.internalCode === code);
+    const product = products.find((p) => !p.isCombo && (p.barcode === code || p.internalCode === code));
 
     if (product) {
       const existing = items.findIndex((it) => it.productId === product.id);
@@ -201,7 +202,7 @@ const Purchases = () => {
     detail: s.cuit ? `CUIT ${s.cuit}` : '',
     keywords: [s.cuit, s.email],
   }));
-  const productOptions = products.map((p) => ({
+  const productOptions = products.filter((p) => !p.isCombo).map((p) => ({
     value: p.id,
     label: p.name,
     detail: [p.internalCode && `Cód. ${p.internalCode}`, `Stock: ${p.stock}`].filter(Boolean).join(' · '),

@@ -5,7 +5,7 @@ import {
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { httpError } from '../utils/httpError.js';
 import { round2 } from '../utils/numbers.js';
-import { splitPrice } from '../utils/taxes.js';
+import { splitPrice, splitLineParts } from '../utils/taxes.js';
 
 const { Op } = pkg;
 
@@ -58,7 +58,7 @@ const loadOrders = (businessId, start, end) =>
   Order.findAll({
     where: { businessId, status: 'active', date: { [Op.gte]: start, [Op.lt]: end } },
     include: [
-      { model: OrderItem, as: 'items', attributes: ['productId', 'quantity', 'unitPrice'] },
+      { model: OrderItem, as: 'items', attributes: ['productId', 'quantity', 'unitPrice', 'components'] },
       { model: Customer, attributes: ['id', 'firstName', 'lastName', 'businessName'] },
       { model: Payment, attributes: ['id', 'name'] },
     ],
@@ -288,31 +288,44 @@ export const vatReport = asyncHandler(async (req, res) => {
     discriminated.internal += Number(order.internalTaxAmount) || 0;
     discriminated.total += Number(order.total);
 
-    // Desglose por alícuota, con la misma fórmula con que se calculó el remito
     const scale = orderScale(order);
-    for (const item of order.items) {
-      const product = products.get(item.productId);
-      const rate = Number(product?.vatRate) || 0;
-      const itemTotal = Number(item.quantity) * Number(item.unitPrice) * scale;
-      const { net, vat, internal } = splitPrice(itemTotal, rate, product?.otherTaxes);
-      const row = byRate.get(rate) || { rate, net: 0, vat: 0, internal: 0, total: 0 };
+    const addPart = ({ vatRate, internalRate, net, vat, internal, total }) => {
+      const row = byRate.get(vatRate) || { rate: vatRate, net: 0, vat: 0, internal: 0, total: 0 };
       row.net += net;
       row.vat += vat;
       row.internal += internal;
-      row.total += itemTotal;
-      byRate.set(rate, row);
+      row.total += total;
+      byRate.set(vatRate, row);
 
-      const internalRate = Number(product?.otherTaxes) || 0;
       if (internalRate > 0) {
         const internalRow = byInternalRate.get(internalRate) || { rate: internalRate, net: 0, internal: 0, total: 0 };
         internalRow.net += net;
         internalRow.internal += internal;
-        internalRow.total += itemTotal;
+        internalRow.total += total;
         byInternalRate.set(internalRate, internalRow);
       }
+    };
+
+    for (const item of order.items) {
+      const itemTotal = Number(item.quantity) * Number(item.unitPrice) * scale;
+
+      // Combo: se reparte entre sus productos con los datos guardados al vender
+      if (Array.isArray(item.components) && item.components.length) {
+        splitLineParts(itemTotal, item.components).forEach(addPart);
+        continue;
+      }
+
+      const product = products.get(item.productId);
+      const rate = Number(product?.vatRate) || 0;
+      const split = splitPrice(itemTotal, rate, product?.otherTaxes);
+      addPart({
+        vatRate: rate,
+        internalRate: Number(product?.otherTaxes) || 0,
+        total: itemTotal,
+        ...split,
+      });
     }
   }
-
   res.json({
     range: { from, to },
     discriminated: {
@@ -379,7 +392,8 @@ export const dashboard = asyncHandler(async (req, res) => {
     .slice(0, 5);
   const topProducts = await loadProductsMap(businessId, top.map(([id]) => id));
 
-  const stockWhere = { businessId, active: true };
+  // Los combos no tienen stock propio: no cuentan como stock bajo
+  const stockWhere = { businessId, active: true, isCombo: false };
   const [lowStockCount, outOfStockCount, lowStockItems] = await Promise.all([
     Product.count({ where: { ...stockWhere, stock: { [Op.lte]: LOW_STOCK_THRESHOLD } } }),
     Product.count({ where: { ...stockWhere, stock: { [Op.lte]: 0 } } }),

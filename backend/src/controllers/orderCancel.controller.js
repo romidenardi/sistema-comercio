@@ -13,7 +13,6 @@ const orderIncludes = [
   { model: OrderItem, as: 'items', include: [{ model: Product, attributes: ['id', 'name', 'internalCode'] }] },
 ];
 
-// Anula un remito y devuelve al stock lo que se había descontado
 export const cancelOrder = asyncHandler(async (req, res) => {
   const { businessId, id: userId } = req.user;
   const reason = String(req.body?.reason || '').trim().slice(0, 255) || null;
@@ -38,11 +37,17 @@ export const cancelOrder = asyncHandler(async (req, res) => {
       : 'cliente';
 
     const quantityByProduct = new Map();
+    const addBack = (productId, quantity) => {
+      quantityByProduct.set(productId, (quantityByProduct.get(productId) || 0) + quantity);
+    };
     for (const item of items) {
-      quantityByProduct.set(
-        item.productId,
-        (quantityByProduct.get(item.productId) || 0) + Number(item.quantity)
-      );
+      if (Array.isArray(item.components) && item.components.length) {
+        for (const component of item.components) {
+          addBack(component.productId, Number(item.quantity) * Number(component.quantity));
+        }
+      } else {
+        addBack(item.productId, Number(item.quantity));
+      }
     }
 
     for (const [productId, quantity] of quantityByProduct) {

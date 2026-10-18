@@ -41,6 +41,7 @@ export const createStockMovement = asyncHandler(async (req, res) => {
       lock: t.LOCK.UPDATE,
     });
     if (!product) throw httpError('Producto no encontrado', 404);
+    if (product.isCombo) throw httpError('Un combo no tiene stock propio: se calcula con sus productos');
 
     let delta;
     if (type === 'in') {

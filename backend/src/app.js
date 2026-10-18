@@ -6,6 +6,7 @@ import authRoutes from './routes/auth.routes.js';
 import platformRoutes from './routes/platform.routes.js';
 import categoryRoutes from './routes/category.routes.js';
 import productRoutes from './routes/product.routes.js';
+import comboRoutes from './routes/combo.routes.js';
 import stockMovementRoutes from './routes/stockMovement.routes.js';
 import paymentRoutes from './routes/payment.routes.js';
 import customerRoutes from './routes/customer.routes.js';
@@ -57,6 +58,7 @@ app.use('/api/platform', platformRoutes);
 
 app.use('/api/categories', authMiddleware, categoryRoutes);
 app.use('/api/products', authMiddleware, productRoutes);
+app.use('/api/combos', authMiddleware, comboRoutes);
 app.use('/api/stock-movements', authMiddleware, stockMovementRoutes);
 app.use('/api/payments', authMiddleware, paymentRoutes);
 app.use('/api/customers', authMiddleware, customerRoutes);
