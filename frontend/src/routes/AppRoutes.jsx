@@ -1,8 +1,6 @@
 import { Routes, Route } from 'react-router-dom';
 import Login from '../pages/Login/Login.jsx';
 import Activate from '../pages/Activate/Activate.jsx';
-import ForgotPassword from '../pages/Auth/ForgotPassword.jsx';
-import ResetPassword from '../pages/Auth/ResetPassword.jsx';
 import Terms from '../pages/Legal/Terms.jsx';
 import Privacy from '../pages/Legal/Privacy.jsx';
 import PlatformLogin from '../pages/Platform/PlatformLogin.jsx';
@@ -19,6 +17,7 @@ import Orders from '../pages/Orders/Orders.jsx';
 import OrderPrint from '../pages/Orders/OrderPrint.jsx';
 import Imports from '../pages/Imports/Imports.jsx';
 import Users from '../pages/Users/Users.jsx';
+import ExportData from '../pages/Export/ExportData.jsx';
 import NotFound from '../pages/NotFound/NotFound.jsx';
 import PrivateRoute from './PrivateRoute.jsx';
 import Layout from '../components/layout/Layout.jsx';
@@ -28,8 +27,6 @@ const AppRoutes = () => {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/activar" element={<Activate />} />
-      <Route path="/olvide-contrasena" element={<ForgotPassword />} />
-      <Route path="/restablecer" element={<ResetPassword />} />
       <Route path="/terminos" element={<Terms />} />
       <Route path="/privacidad" element={<Privacy />} />
       <Route path="/plataforma/login" element={<PlatformLogin />} />
@@ -43,6 +40,10 @@ const AppRoutes = () => {
 
           <Route path="/orders" element={<Orders />} />
           <Route path="/purchases" element={<Purchases />} />
+
+          {/* La pantalla controla por sí misma que solo el administrador pueda exportar,
+              porque también es la única disponible cuando el comercio está en baja */}
+          <Route path="/exportar" element={<ExportData />} />
 
           <Route element={<PrivateRoute allowedRoles={['admin', 'editor']} />}>
             <Route path="/reports" element={<Reports />} />

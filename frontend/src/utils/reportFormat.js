@@ -27,7 +27,6 @@ export const presetRange = (preset, now = new Date()) => {
   }
 };
 
-// "2026-10-05" -> "05/10"; "2026-10" -> "10/2026"
 export const periodLabel = (period, groupBy) => {
   if (groupBy === 'month') {
     const [y, m] = period.split('-');
@@ -43,7 +42,6 @@ export const formatDay = (key) => {
   return `${d}/${m}/${y}`;
 };
 
-// CSV pensado para Excel en español: separador ";", decimales con coma, con BOM
 export const downloadCsv = (filename, headers, rows) => {
   const cell = (value) => {
     const text = typeof value === 'number' ? String(value).replace('.', ',') : (value ?? '');

@@ -4,7 +4,10 @@ import { User, Business } from '../models/index.js';
 
 const { Op } = pkg;
 
-export const authMiddleware = async (req, res, next) => {
+const CLOSING_MESSAGE =
+  'Esta cuenta está en proceso de baja. Solo se permite exportar los datos.';
+
+const buildAuthMiddleware = ({ allowClosing }) => async (req, res, next) => {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -34,7 +37,17 @@ export const authMiddleware = async (req, res, next) => {
       include: [{ model: Business, attributes: ['status', 'type'] }],
     });
 
-    if (!user || user.Business.status !== 'active') {
+    if (!user) {
+      return res.status(401).json({ message: 'Sesión inválida' });
+    }
+
+    const status = user.Business.status;
+
+    if (status === 'closing') {
+      if (!allowClosing || user.role !== 'admin') {
+        return res.status(403).json({ message: CLOSING_MESSAGE, code: 'ACCOUNT_CLOSING' });
+      }
+    } else if (status !== 'active') {
       return res.status(401).json({ message: 'Sesión inválida' });
     }
 
@@ -43,9 +56,14 @@ export const authMiddleware = async (req, res, next) => {
       businessId: user.businessId,
       role: user.role,
       businessType: user.Business.type,
+      businessStatus: status,
     };
     next();
   } catch (error) {
     next(error);
   }
 };
+
+export const authMiddleware = buildAuthMiddleware({ allowClosing: false });
+
+export const authAllowClosing = buildAuthMiddleware({ allowClosing: true });

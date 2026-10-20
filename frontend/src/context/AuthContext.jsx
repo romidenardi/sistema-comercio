@@ -53,6 +53,7 @@ export const AuthProvider = ({ children }) => {
         user,
         role: user?.role || null,
         isDemo: user?.businessType === 'demo',
+        isClosing: user?.businessStatus === 'closing',
         isAuthenticated: !!token,
         login,
         logout,

@@ -6,9 +6,12 @@ import { httpError } from '../utils/httpError.js';
 import { generateInviteToken, INVITE_TTL_MS } from '../utils/inviteToken.js';
 import { sendMail } from '../utils/mailer.js';
 import { inviteEmail } from '../utils/mailTemplates.js';
+import { closureStartedEmail } from '../utils/closureEmails.js';
 import { resetDemoBusiness } from '../services/demo.service.js';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const CLOSURE_DAYS = 30;
 
 const buildInviteUrl = (token) =>
   `${process.env.APP_URL.replace(/\/$/, '')}/activar?token=${token}`;
@@ -29,10 +32,9 @@ export const platformLogin = asyncHandler(async (req, res) => {
   res.json({ token, admin: { id: admin.id, name: admin.name } });
 });
 
-// Solo metadatos de cuentas: nunca productos, clientes, remitos ni contraseñas
 export const listBusinesses = asyncHandler(async (req, res) => {
   const businesses = await Business.findAll({
-    attributes: ['id', 'name', 'status', 'type', 'trialEndsAt', 'contactEmail', 'createdAt'],
+    attributes: ['id', 'name', 'status', 'type', 'trialEndsAt', 'deleteAt', 'contactEmail', 'createdAt'],
     order: [['createdAt', 'DESC']],
   });
 
@@ -148,7 +150,62 @@ export const setBusinessStatus = asyncHandler(async (req, res) => {
   const business = await Business.findByPk(req.params.id);
   if (!business) throw httpError('Comercio no encontrado', 404);
 
+  if (business.status === 'closing') {
+    throw httpError('El comercio tiene una baja pendiente. Cancelá la baja antes de cambiar su estado.', 409);
+  }
+
   await business.update({ status });
+  res.json({ id: business.id, name: business.name, status: business.status });
+});
+
+export const startClosure = asyncHandler(async (req, res) => {
+  const business = await Business.findByPk(req.params.id);
+  if (!business) throw httpError('Comercio no encontrado', 404);
+
+  if (business.type === 'demo') throw httpError('La cuenta demo no se da de baja');
+  if (business.status === 'closing') throw httpError('El comercio ya tiene una baja pendiente', 409);
+
+  if (String(req.body.confirmName || '').trim() !== business.name) {
+    throw httpError('El nombre de confirmación no coincide con el del comercio');
+  }
+
+  const deleteAt = new Date(Date.now() + CLOSURE_DAYS * 24 * 60 * 60 * 1000);
+  await business.update({ status: 'closing', deleteAt });
+
+  const admins = await User.findAll({
+    where: { businessId: business.id, role: 'admin', active: true },
+    attributes: ['name', 'email'],
+  });
+
+  let emailsSent = 0;
+  for (const admin of admins) {
+    try {
+      const mail = await sendMail({
+        to: admin.email,
+        ...closureStartedEmail({ name: admin.name, businessName: business.name, deleteAt }),
+      });
+      if (mail.sent) emailsSent += 1;
+    } catch (error) {
+      console.error('[platform] No se pudo enviar el aviso de baja:', error.message);
+    }
+  }
+
+  res.json({
+    id: business.id,
+    name: business.name,
+    status: business.status,
+    deleteAt,
+    adminCount: admins.length,
+    emailsSent,
+  });
+});
+
+export const cancelClosure = asyncHandler(async (req, res) => {
+  const business = await Business.findByPk(req.params.id);
+  if (!business) throw httpError('Comercio no encontrado', 404);
+  if (business.status !== 'closing') throw httpError('El comercio no tiene una baja pendiente', 409);
+
+  await business.update({ status: 'active', deleteAt: null });
   res.json({ id: business.id, name: business.name, status: business.status });
 });
 

@@ -13,7 +13,8 @@ import PurchaseItem from './purchaseItem.model.js';
 import Order from './order.model.js';
 import OrderItem from './orderItem.model.js';
 import ComboItem from './comboItem.model.js';
-import PlatformAdmin from './platformAdmin.model.js'; 
+import PlatformAdmin from './platformAdmin.model.js';
+import ClosureRecord from './closureRecord.model.js';
 
 Business.hasMany(Category, { foreignKey: 'businessId' });
 Category.belongsTo(Business, { foreignKey: 'businessId' });
@@ -84,4 +85,5 @@ ComboItem.belongsTo(Product, { as: 'product', foreignKey: 'productId' });
 export {
   sequelize, Business, Category, Product, StockMovement, Payment, InstallmentPlan,
   User, Customer, Supplier, Purchase, PurchaseItem, Order, OrderItem, ComboItem, PlatformAdmin,
+  ClosureRecord,
 };

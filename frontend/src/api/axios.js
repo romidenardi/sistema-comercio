@@ -25,6 +25,22 @@ api.interceptors.response.use(
       }
     }
 
+    if (error.response?.status === 403 && error.response?.data?.code === 'ACCOUNT_CLOSING') {
+      try {
+        const raw = localStorage.getItem('user');
+        if (raw) {
+          const user = JSON.parse(raw);
+          user.businessStatus = 'closing';
+          localStorage.setItem('user', JSON.stringify(user));
+        }
+      } catch {
+        /* sin storage */
+      }
+      if (window.location.pathname !== '/exportar') {
+        window.location.href = '/exportar';
+      }
+    }
+
     return Promise.reject(error);
   }
 );

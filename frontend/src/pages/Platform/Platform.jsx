@@ -8,6 +8,8 @@ import {
   setBusinessStatus,
   reinviteBusinessAdmin,
   resetDemoBusiness,
+  startBusinessClosure,
+  cancelBusinessClosure,
 } from '../../api/platform.api';
 
 const EMPTY_FORM = { name: '', adminName: '', adminEmail: '', type: 'client', trialDays: '' };
@@ -21,6 +23,18 @@ const formatDate = (value, withTime = false) => {
 };
 
 const errorMessage = (err) => err.response?.data?.message || 'Ocurrió un error. Probá de nuevo.';
+
+const STATUS_LABELS = {
+  active: 'Activo',
+  suspended: 'Suspendido',
+  closing: 'En baja',
+};
+
+const STATUS_CLASSES = {
+  active: 'platform-badge-ok',
+  suspended: 'platform-badge-off',
+  closing: 'platform-badge-warn',
+};
 
 export default function Platform() {
   const navigate = useNavigate();
@@ -101,6 +115,41 @@ export default function Platform() {
     setError('');
     try {
       await setBusinessStatus(business.id, next);
+      await load();
+    } catch (err) {
+      setError(errorMessage(err));
+    }
+  };
+
+  const handleStartClosure = async (business) => {
+    const typed = window.prompt(
+      `Vas a dar de baja "${business.name}".\n\n` +
+        `Desde ahora solo su administrador podrá ingresar, para exportar sus datos. ` +
+        `A los 30 días se eliminan todos sus datos (productos, clientes, remitos, usuarios, etc.).\n\n` +
+        `Para confirmar, escribí el nombre exacto del comercio:`
+    );
+    if (typed === null) return;
+
+    setError('');
+    try {
+      const { data } = await startBusinessClosure(business.id, typed.trim());
+      window.alert(
+        `Baja registrada. Los datos se eliminarán el ${formatDate(data.deleteAt)}.\n` +
+          `Avisos por mail enviados: ${data.emailsSent} de ${data.adminCount}.`
+      );
+      await load();
+    } catch (err) {
+      setError(errorMessage(err));
+    }
+  };
+
+  const handleCancelClosure = async (business) => {
+    const message = `¿Cancelar la baja de "${business.name}"? El comercio vuelve a estar activo y no se borra nada.`;
+    if (!window.confirm(message)) return;
+
+    setError('');
+    try {
+      await cancelBusinessClosure(business.id);
       await load();
     } catch (err) {
       setError(errorMessage(err));
@@ -250,6 +299,7 @@ export default function Platform() {
                 {businesses.map((business) => {
                   const admin = business.admins[0];
                   const inviteExpired = admin?.inviteExpiresAt && new Date(admin.inviteExpiresAt) < new Date();
+                  const isClosing = business.status === 'closing';
                   return (
                     <tr key={business.id}>
                       <td>
@@ -259,9 +309,15 @@ export default function Platform() {
                       </td>
                       <td>{business.type === 'demo' ? 'Demo' : 'Cliente'}</td>
                       <td>
-                        <span className={`platform-badge ${business.status === 'active' ? 'platform-badge-ok' : 'platform-badge-off'}`}>
-                          {business.status === 'active' ? 'Activo' : 'Suspendido'}
+                        <span className={`platform-badge ${STATUS_CLASSES[business.status] || 'platform-badge-off'}`}>
+                          {STATUS_LABELS[business.status] || business.status}
                         </span>
+                        {isClosing && business.deleteAt && (
+                          <>
+                            <br />
+                            <small>Se elimina el {formatDate(business.deleteAt)}</small>
+                          </>
+                        )}
                         {business.trialEndsAt && (
                           <>
                             <br />
@@ -290,9 +346,11 @@ export default function Platform() {
                       <td>{formatDate(business.createdAt)}</td>
                       <td>
                         <div className="platform-actions">
-                          <button type="button" onClick={() => handleToggleStatus(business)}>
-                            {business.status === 'active' ? 'Suspender' : 'Reactivar'}
-                          </button>
+                          {!isClosing && (
+                            <button type="button" onClick={() => handleToggleStatus(business)}>
+                              {business.status === 'active' ? 'Suspender' : 'Reactivar'}
+                            </button>
+                          )}
                           {admin && (
                             <button type="button" onClick={() => handleReinvite(business)}>
                               Link nuevo
@@ -301,6 +359,16 @@ export default function Platform() {
                           {business.type === 'demo' && (
                             <button type="button" onClick={() => handleResetDemo(business)}>
                               Reiniciar demo
+                            </button>
+                          )}
+                          {business.type === 'client' && !isClosing && (
+                            <button type="button" onClick={() => handleStartClosure(business)}>
+                              Dar de baja
+                            </button>
+                          )}
+                          {isClosing && (
+                            <button type="button" onClick={() => handleCancelClosure(business)}>
+                              Cancelar baja
                             </button>
                           )}
                         </div>

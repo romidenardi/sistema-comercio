@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Outlet, NavLink, useLocation } from 'react-router-dom';
+import { Outlet, NavLink, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
 import logo from '../../assets/logo.png';
 
@@ -10,7 +10,7 @@ const ROLE_LABELS = {
 };
 
 const Layout = () => {
-  const { logout, role, user, isDemo } = useAuth();
+  const { logout, role, user, isDemo, isClosing } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const location = useLocation();
 
@@ -49,6 +49,11 @@ const Layout = () => {
     }
   };
 
+  // Comercio con baja pendiente: la única pantalla disponible es la exportación de datos
+  if (isClosing && location.pathname !== '/exportar') {
+    return <Navigate to="/exportar" replace />;
+  }
+
   const canManageData = role === 'admin' || role === 'editor';
   const isAdmin = role === 'admin';
 
@@ -85,17 +90,24 @@ const Layout = () => {
         )}
 
         <nav className="sidebar-nav">
-          <NavLink to="/" end>Inicio</NavLink>
-          {canManageData && <NavLink to="/reports">Reportes</NavLink>}
-          {canManageData && <NavLink to="/products">Productos</NavLink>}
-          {canManageData && <NavLink to="/categories">Categorías</NavLink>}
-          {canManageData && <NavLink to="/payments">Formas de pago</NavLink>}
-          {canManageData && <NavLink to="/customers">Clientes</NavLink>}
-          <NavLink to="/orders">Remitos</NavLink>
-          {canManageData && <NavLink to="/suppliers">Proveedores</NavLink>}
-          <NavLink to="/purchases">Compras</NavLink>
-          {canManageData && !isDemo && <NavLink to="/imports">Importar</NavLink>}
-          {isAdmin && !isDemo && <NavLink to="/users">Usuarios</NavLink>}
+          {isClosing ? (
+            <NavLink to="/exportar">Exportar mis datos</NavLink>
+          ) : (
+            <>
+              <NavLink to="/" end>Inicio</NavLink>
+              {canManageData && <NavLink to="/reports">Reportes</NavLink>}
+              {canManageData && <NavLink to="/products">Productos</NavLink>}
+              {canManageData && <NavLink to="/categories">Categorías</NavLink>}
+              {canManageData && <NavLink to="/payments">Formas de pago</NavLink>}
+              {canManageData && <NavLink to="/customers">Clientes</NavLink>}
+              <NavLink to="/orders">Remitos</NavLink>
+              {canManageData && <NavLink to="/suppliers">Proveedores</NavLink>}
+              <NavLink to="/purchases">Compras</NavLink>
+              {canManageData && !isDemo && <NavLink to="/imports">Importar</NavLink>}
+              {isAdmin && !isDemo && <NavLink to="/users">Usuarios</NavLink>}
+              {isAdmin && !isDemo && <NavLink to="/exportar">Exportar mis datos</NavLink>}
+            </>
+          )}
         </nav>
         <button className="sidebar-logout" onClick={handleLogout}>Cerrar sesión</button>
       </aside>

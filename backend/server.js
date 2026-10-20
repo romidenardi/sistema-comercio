@@ -3,6 +3,7 @@ dotenv.config();
 
 import app from './src/app.js';
 import { sequelize } from './src/models/index.js';
+import { startClosureScheduler } from './src/services/closureScheduler.service.js';
 
 const PORT = process.env.PORT || 3000;
 
@@ -29,6 +30,8 @@ const start = async () => {
     await sequelize.sync();
 
     app.listen(PORT, () => console.log(`Servidor corriendo en puerto ${PORT}`));
+
+    startClosureScheduler();
   } catch (error) {
     console.error('Error al iniciar:', error);
     process.exit(1);

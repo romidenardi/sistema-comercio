@@ -4,6 +4,8 @@ import {
   listBusinesses,
   createBusiness,
   setBusinessStatus,
+  startClosure,
+  cancelClosure,
   reinviteUser,
   resetDemo,
 } from '../controllers/platform.controller.js';
@@ -17,6 +19,8 @@ router.use(platformAuthMiddleware);
 router.get('/businesses', listBusinesses);
 router.post('/businesses', createBusiness);
 router.patch('/businesses/:id/status', setBusinessStatus);
+router.post('/businesses/:id/closure', startClosure);
+router.delete('/businesses/:id/closure', cancelClosure);
 router.post('/businesses/:id/reinvite', reinviteUser);
 router.post('/businesses/:id/reset-demo', resetDemo);
 

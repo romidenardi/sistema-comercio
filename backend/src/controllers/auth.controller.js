@@ -25,14 +25,20 @@ export const login = asyncHandler(async (req, res) => {
 
   const user = await User.findOne({
     where: { email },
-    include: [{ model: Business, attributes: ['id', 'status', 'type'] }],
+    include: [{ model: Business, attributes: ['id', 'status', 'type', 'deleteAt'] }],
   });
 
   const valid =
     user && user.active && user.passwordHash && (await bcrypt.compare(password, user.passwordHash));
   if (!valid) throw httpError('Credenciales inválidas', 401);
 
-  if (user.Business.status !== 'active') {
+  const businessStatus = user.Business.status;
+
+  if (businessStatus === 'closing') {
+    if (user.role !== 'admin') {
+      throw httpError('Esta cuenta está en proceso de baja. Consultale al administrador del comercio.', 403);
+    }
+  } else if (businessStatus !== 'active') {
     throw httpError('El acceso de este comercio está suspendido. Contactanos para reactivarlo.', 403);
   }
 
@@ -52,6 +58,8 @@ export const login = asyncHandler(async (req, res) => {
       email: user.email,
       role: user.role,
       businessType: user.Business.type,
+      businessStatus,
+      deleteAt: businessStatus === 'closing' ? user.Business.deleteAt : null,
     },
   });
 });
@@ -102,7 +110,13 @@ export const forgotPassword = asyncHandler(async (req, res) => {
   res.json(generic);
 
   if (!user || !user.active || !user.Business) return;
-  if (user.Business.status !== 'active' || user.Business.type === 'demo') return;
+  if (user.Business.type === 'demo') return;
+  const status = user.Business.status;
+  if (status === 'closing') {
+    if (user.role !== 'admin') return;
+  } else if (status !== 'active') {
+    return;
+  }
   if (wasIssuedRecently(user, 60)) return;
 
   issueAccessLink(user, user.Business.name).catch((error) => {

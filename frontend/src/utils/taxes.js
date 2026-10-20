@@ -1,4 +1,3 @@
-// Alícuotas de IVA que se pueden elegir al cargar un producto
 export const VAT_OPTIONS = [
   { value: '21', label: '21%' },
   { value: '10.5', label: '10,5%' },

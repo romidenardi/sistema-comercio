@@ -1,7 +1,10 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useResource } from '../../hooks/useResource.js';
+import { useAuth } from '../../context/AuthContext.jsx';
 import * as customersApi from '../../api/customers.api.js';
+import { downloadCustomerData, anonymizeCustomer } from '../../api/dataRights.api.js';
+import { saveBlob, filenameFromResponse, errorMessageFrom } from '../../utils/download.js';
 import Spinner from '../../components/common/Spinner.jsx';
 import SearchInput from '../../components/common/SearchInput.jsx';
 import { matchesSearch } from '../../utils/search.js';
@@ -17,6 +20,8 @@ const FISCAL_CONDITIONS = ['Consumidor Final', 'Responsable Inscripto', 'Monotri
 
 const Customers = () => {
   const { items: customers, loading, create, update, remove } = useResource(api);
+  const { role } = useAuth();
+  const isAdmin = role === 'admin';
   const [editingId, setEditingId] = useState(null);
   const [personType, setPersonType] = useState('individual');
   const [search, setSearch] = useState('');
@@ -80,9 +85,34 @@ const Customers = () => {
     if (confirm('¿Eliminar este cliente?')) remove(id);
   };
 
-  const displayName = (c) => c.businessName || `${c.firstName} ${c.lastName || ''}`.trim();
+  const displayName = (c) =>
+    c.businessName || [c.firstName, c.lastName].filter(Boolean).join(' ');
 
-  // La fila que se está editando sigue visible aunque el filtro no la incluya
+  const onExportData = async (customer) => {
+    try {
+      const response = await downloadCustomerData(customer.id);
+      saveBlob(response.data, filenameFromResponse(response, 'cliente-datos.xlsx'));
+    } catch (err) {
+      alert(await errorMessageFrom(err));
+    }
+  };
+
+  const onAnonymize = async (customer) => {
+    const message =
+      `Se borrarán los datos personales de "${displayName(customer)}" ` +
+      `(nombre, CUIT, dirección, teléfono y email). Sus remitos se conservan. ` +
+      `Esta acción no se puede deshacer. ¿Continuar?`;
+    if (!confirm(message)) return;
+
+    try {
+      const { data } = await anonymizeCustomer(customer.id);
+      alert(data.message);
+      window.location.reload();
+    } catch (err) {
+      alert(await errorMessageFrom(err));
+    }
+  };
+
   const visibleCustomers = customers.filter((c) => c.id === editingId || matchesSearch(search, [
     c.businessName, c.firstName, c.lastName, c.cuit, c.city, c.province, c.fiscalCondition, c.phone, c.email,
   ]));
@@ -271,6 +301,12 @@ const Customers = () => {
                     <td data-label="Acciones">
                       <button onClick={() => startEdit(customer)}>Editar</button>
                       <button onClick={() => onDelete(customer.id)}>Eliminar</button>
+                      {isAdmin && (
+                        <>
+                          <button onClick={() => onExportData(customer)}>Exportar datos</button>
+                          <button onClick={() => onAnonymize(customer)}>Anonimizar</button>
+                        </>
+                      )}
                     </td>
                   </>
                 )}

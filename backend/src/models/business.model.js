@@ -7,7 +7,7 @@ const Business = sequelize.define('Business', {
   name: { type: DataTypes.STRING, allowNull: false },
   cuit: { type: DataTypes.STRING, allowNull: true },
   status: {
-    type: DataTypes.ENUM('active', 'suspended'),
+    type: DataTypes.ENUM('active', 'suspended', 'closing'),
     allowNull: false,
     defaultValue: 'active',
   },
@@ -18,6 +18,7 @@ const Business = sequelize.define('Business', {
   },
   trialEndsAt: { type: DataTypes.DATE, allowNull: true, field: 'trial_ends_at' },
   contactEmail: { type: DataTypes.STRING, allowNull: true, field: 'contact_email' },
+  deleteAt: { type: DataTypes.DATE, allowNull: true, field: 'delete_at' },
 }, {
   tableName: 'businesses',
 });

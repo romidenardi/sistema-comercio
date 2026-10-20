@@ -41,3 +41,7 @@ export const setBusinessStatus = (id, status) =>
 export const reinviteBusinessAdmin = (id, userId) =>
   platformApi.post(`/platform/businesses/${id}/reinvite`, userId ? { userId } : {});
 export const resetDemoBusiness = (id) => platformApi.post(`/platform/businesses/${id}/reset-demo`);
+
+export const startBusinessClosure = (id, confirmName) =>
+  platformApi.post(`/platform/businesses/${id}/closure`, { confirmName });
+export const cancelBusinessClosure = (id) => platformApi.delete(`/platform/businesses/${id}/closure`);
