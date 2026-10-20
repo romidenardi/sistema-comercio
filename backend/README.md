@@ -1,6 +1,6 @@
 # Talarix: Backend
 
-API de gestión para pequeños comercios (stock, clientes, proveedores, compras, remitos, formas de pago, cuotas, descuentos e IVA). Multi-comercio: una sola base de datos, con los datos de cada comercio separados por `businessId`.
+API de gestión para pequeños comercios (stock, clientes, proveedores, compras, remitos, formas de pago, cuotas, descuentos, IVA, combos y productos por peso con balanza). Multi-comercio: una sola base de datos, con los datos de cada comercio separados por `businessId`.
 
 **Stack:** Node.js, Express 5, Sequelize, MySQL, JWT, Nodemailer, node-cron, xlsx (SheetJS). Desplegado en Railway.
 
@@ -65,9 +65,11 @@ src/
   services/        servicios: datos de la cuenta demo, exportación a Excel,
                    borrado de un comercio y programador de bajas
   jobs/            tareas programadas (reinicio nocturno de la demo)
-  utils/           ayudas: asyncHandler, httpError, números, tokens de
-                   invitación, versión de términos, mails y links de acceso,
-                   mails de baja
+  utils/           ayudas: asyncHandler, httpError, números y cantidades
+                   (numbers.js), getter de columnas decimales
+                   (decimalColumn.js), formato de etiquetas de balanza
+                   (scaleConfig.js), tokens de invitación, versión de
+                   términos, mails y links de acceso, mails de baja
 scripts/           scripts de operación (crear superadmin)
 ```
 
@@ -83,6 +85,7 @@ Todas las rutas cuelgan de `/api`. Salvo `auth` y `platform`, exigen token de us
 | `/platform/businesses/:id/closure` | superadmin | `POST` inicia la baja (pide el nombre exacto del comercio en `confirmName`); `DELETE` la cancela |
 | `/categories`, `/products`, `/stock-movements` | autenticados | Catálogo y movimientos de stock |
 | `/combos` | autenticados | Combos de productos |
+| `/scale-config` | `GET`: autenticados; `PUT`: `admin`, `editor` | Formato de las etiquetas de la balanza del comercio |
 | `/payments`, `/customers`, `/suppliers` | autenticados | Formas de pago (cuotas y descuentos), clientes, proveedores |
 | `/purchases`, `/orders` | autenticados | Compras y remitos |
 | `/orders/:id/cancel` | `admin`, `editor` | Anula un remito y devuelve el stock |
@@ -98,6 +101,11 @@ Detalles que conviene saber:
 - Los remitos anulados (`status = 'cancelled'`) quedan en el historial y se excluyen de los reportes.
 - El código de barras de un producto es opcional y **único por comercio**. Los vacíos se guardan como `NULL`.
 - Los errores de unicidad responden `409` con un mensaje en castellano.
+- **Productos por peso:** `unitType = 'weight'`. Su precio, costo y promo son **por kg** y las cantidades están en kg con hasta 3 decimales. Los productos por unidad solo admiten cantidades enteras (lo valida el servidor).
+- Stock y cantidades (`products.stock`, `order_items`, `purchase_items`, `stock_movements`) son `DECIMAL(12,3)`. Sequelize devuelve los DECIMAL como texto: los modelos usan `numericGetter` (`utils/decimalColumn.js`) para que lleguen como número, y las cuentas con cantidades se redondean con `round3`.
+- **Balanza:** cada producto por peso puede tener un `scalePlu` (1 a 9999), único por comercio. El comercio guarda en `businesses.scale_config` cómo se arma la etiqueta EAN-13 (prefijo, posición del PLU y del valor, si trae peso o importe, decimales, dígito de control). El valor de fábrica es el de Systel. La etiqueta se interpreta en el frontend; el backend solo guarda la configuración.
+- Los combos siguen usando cantidades enteras y no admiten productos por peso (se filtra en el frontend).
+- La importación acepta la columna opcional `PLU Balanza` (solo con `Unidad = peso`); en productos por peso, Precio y Costo son por kg.
 
 ## Seguridad y multi-comercio
 - Todo recurso se filtra por `req.user.businessId`. El middleware de autenticación revalida en cada request que el usuario esté activo y con contraseña, y que el comercio esté activo.
@@ -202,6 +210,18 @@ ALTER TABLE businesses ADD COLUMN delete_at DATETIME NULL
 ```
 La tabla `closure_records` la crea `sync` sola.
 
+**Productos por peso y balanza** (octubre 2026):
+```sql
+ALTER TABLE businesses ADD COLUMN scale_config JSON NULL
+ALTER TABLE products ADD COLUMN scale_plu INT NULL
+ALTER TABLE products MODIFY COLUMN stock DECIMAL(12,3) NOT NULL DEFAULT 0
+ALTER TABLE order_items MODIFY COLUMN quantity DECIMAL(12,3) NOT NULL
+ALTER TABLE purchase_items MODIFY COLUMN quantity DECIMAL(12,3) NOT NULL
+ALTER TABLE stock_movements MODIFY COLUMN quantity DECIMAL(12,3) NOT NULL
+CREATE UNIQUE INDEX uq_products_business_scale_plu ON products (business_id, scale_plu)
+```
+El último solo hace falta si `sync` no crea el índice (está declarado en `product.model.js`). Los datos enteros existentes se convierten solos a 3 decimales.
+
 ## Flujo de trabajo
 
 El repositorio es único y contiene `backend/` y `frontend/`. **Hacer `git add` y `commit` desde la raíz del repo**: si se hace desde una sola de las carpetas, los cambios de la otra no se incluyen.
@@ -233,4 +253,4 @@ Restaurar: servicio MySQL → Backups → elegir fecha → Restore → revisar �
 La versión vigente de los términos y del aviso de privacidad está en `src/utils/legal.js` y debe coincidir con `LEGAL_VERSION` del frontend. Hoy es un borrador (`2026-10-borrador-1`) pendiente de revisión legal. La casilla de contacto es `hola@talarix.com.ar`.
 
 ---
-Última actualización: 20/10/2026.
+Última actualización: 20/10/2026 (productos por peso y balanza).

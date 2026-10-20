@@ -1,6 +1,6 @@
 # Talarix: Frontend
 
-Interfaz web del sistema de gestión para pequeños comercios (stock, clientes, proveedores, compras, remitos, formas de pago, reportes).
+Interfaz web del sistema de gestión para pequeños comercios (stock, clientes, proveedores, compras, remitos, formas de pago, reportes, productos por peso con balanza).
 
 **Stack:** React 19, Vite, React Router 7, React Hook Form, Axios. Desplegado en Vercel.
 
@@ -48,10 +48,13 @@ src/
   context/      AuthContext (sesión, rol, modo demo, comercio en baja)
   hooks/        hooks compartidos (p. ej. useResource)
   components/   layout (menú y barra lateral) y componentes compartidos
+                (Required.jsx: marca (*) y leyenda de campo obligatorio)
   pages/        una carpeta por pantalla (Export/ tiene la exportación de datos)
   legal/        textos de términos y privacidad (legalContent.js)
   routes/       definición de rutas y rutas privadas
-  utils/        ayudas de formato y descarga de archivos (download.js)
+  utils/        ayudas de formato y descarga de archivos (download.js),
+                cantidades y productos por peso (quantity.js) y lectura de
+                etiquetas de balanza (scale.js)
   index.css     estilos globales y variables de color
 ```
 
@@ -63,6 +66,9 @@ src/
 
 ## Funciones a tener en cuenta
 - **Códigos de barras:** se pueden cargar y buscar con la **cámara del celular** (librería `html5-qrcode`) o con un **lector USB**, que funciona como teclado: escribe el código y envía Enter. Dentro de los campos de código de barras el Enter está bloqueado para no enviar el formulario por error. La cámara solo funciona con **HTTPS** (en `localhost` también).
+- **Productos por peso:** el precio, el costo y la promo se guardan **por kg**. Al cargar o editar el producto se puede elegir "Cargo precio y costo por" (kg, 500 g, 250 g, 100 g o 1 g) y el sistema lo convierte y muestra cómo queda guardado. En remitos y compras la cantidad se escribe en **kg o g** (selector al lado) y se muestra el cálculo (`0,100 kg × $30.000,00 por kg = $3.000,00`). Las tablas y el remito impreso muestran `/kg`. Los productos por peso no se ofrecen en combos. Las ayudas están en `utils/quantity.js`.
+- **Balanza** (Productos → pestaña **Balanza**): activa la lectura de etiquetas EAN-13 (valores de fábrica de Systel) y permite ajustar prefijo, posiciones, si la etiqueta trae peso (CANTID) o importe (TOTAL), decimales y dígito de control. Tiene un probador donde se pega el número de una etiqueta. Cada producto por peso lleva su **PLU de balanza**. En **Remitos**, la barra "Escanear código de barras" reconoce la etiqueta (`utils/scale.js`), busca el producto por PLU y suma el peso, o el importe dividido por el precio del sistema; si el importe no coincide con el precio del sistema, avisa. Un código que coincide con un código de barras o interno se toma primero como producto. Las Compras no leen etiquetas de balanza.
+- **Campos obligatorios:** en los formularios, los campos obligatorios llevan `(*)` y al pie se muestra "(*) Campo obligatorio" en el color de alerta. Se usa `RequiredMark` y `RequiredLegend` de `components/common/Required.jsx`.
 - **Usuarios** (solo `admin`): se pueden crear con contraseña asignada, o enviando una **invitación por mail**. Cada usuario tiene un botón para reenviar la invitación o enviar un link de contraseña. Si el mail no sale, se muestra el link para copiarlo.
 - **Plataforma:** al crear un comercio o reinvitar, se envía el mail con el link y se muestra además para copiarlo y compartirlo por WhatsApp.
 - **Menú en el celular:** se muestra como menú hamburguesa (barra superior con botón, y panel lateral con fondo oscurecido).
@@ -95,4 +101,4 @@ Se editan en `src/legal/legalContent.js`. Hoy están en borrador (`LEGAL_VERSION
 Flujo de trabajo, cambios en la base y variables del servidor: ver el README del backend. Recordá hacer `git add` y `commit` desde la **raíz del repo**.
 
 ---
-Última actualización: 20/10/2026.
+Última actualización: 20/10/2026 (productos por peso y balanza).
