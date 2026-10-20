@@ -13,6 +13,7 @@ import { matchesSearch } from '../../utils/search.js';
 import VatSelect from '../../components/common/VatSelect.jsx';
 import { toPercentOrNull, vatToFormValue } from '../../utils/taxes.js';
 import { formatQuantity, PRICE_BASES, toPricePerKg, perKg } from '../../utils/quantity.js';
+import { RequiredMark, RequiredLegend } from '../../components/common/Required.jsx';
 
 const api = {
   getAll: productsApi.getProducts,
@@ -178,7 +179,7 @@ const Products = () => {
 
       <form onSubmit={handleSubmit(onCreate)} className="product-form">
         <div className="field">
-          <label htmlFor="internalCode">Código interno</label>
+          <label htmlFor="internalCode">Código interno<RequiredMark /></label>
           <input id="internalCode" placeholder="Ej: P001" {...register('internalCode', { required: 'Obligatorio' })} />
           {errors.internalCode && <span className="error">{errors.internalCode.message}</span>}
         </div>
@@ -204,7 +205,7 @@ const Products = () => {
         </div>
 
         <div className="field">
-          <label htmlFor="name">Producto</label>
+          <label htmlFor="name">Producto<RequiredMark /></label>
           <input id="name" placeholder="Ej: Cerveza IPA 500ml" {...register('name', { required: 'Obligatorio' })} />
           {errors.name && <span className="error">{errors.name.message}</span>}
         </div>
@@ -262,7 +263,7 @@ const Products = () => {
         )}
 
         <div className="field">
-          <label htmlFor="price">Precio{createUnitType === 'weight' ? ' (por la cantidad elegida)' : ''}</label>
+          <label htmlFor="price">Precio{createUnitType === 'weight' ? ' (por la cantidad elegida)' : ''}<RequiredMark /></label>
           <input id="price" type="number" step="0.01" placeholder="Ej: 1500" {...register('price', { required: 'Obligatorio', min: 0 })} />
         </div>
 
@@ -278,7 +279,7 @@ const Products = () => {
         </div>
 
         <div className="field">
-          <label htmlFor="cost">Costo</label>
+          <label htmlFor="cost">Costo<RequiredMark /></label>
           <input id="cost" type="number" step="0.01" placeholder="Ej: 900" {...register('cost', { required: 'Obligatorio', min: 0 })} />
         </div>
 
@@ -310,6 +311,7 @@ const Products = () => {
         )}
 
         <button type="submit">Agregar producto</button>
+        <RequiredLegend />
       </form>
 
       <SearchInput
@@ -349,7 +351,7 @@ const Products = () => {
                     <td colSpan={8} className="edit-cell">
                       <form onSubmit={editForm.handleSubmit(onUpdate)} className="inline-edit-form">
                         <div className="field">
-                          <label htmlFor={`edit-internalCode-${product.id}`}>Código interno</label>
+                          <label htmlFor={`edit-internalCode-${product.id}`}>Código interno<RequiredMark /></label>
                           <input id={`edit-internalCode-${product.id}`} {...editForm.register('internalCode')} />
                         </div>
                         <div className="field">
@@ -372,7 +374,7 @@ const Products = () => {
                           </div>
                         </div>
                         <div className="field">
-                          <label htmlFor={`edit-name-${product.id}`}>Producto</label>
+                          <label htmlFor={`edit-name-${product.id}`}>Producto<RequiredMark /></label>
                           <input id={`edit-name-${product.id}`} {...editForm.register('name')} />
                         </div>
                         <div className="field">
@@ -422,7 +424,7 @@ const Products = () => {
                           </div>
                         )}
                         <div className="field">
-                          <label htmlFor={`edit-price-${product.id}`}>Precio{editUnitType === 'weight' ? ' (por la cantidad elegida)' : ''}</label>
+                          <label htmlFor={`edit-price-${product.id}`}>Precio{editUnitType === 'weight' ? ' (por la cantidad elegida)' : ''}<RequiredMark /></label>
                           <input id={`edit-price-${product.id}`} type="number" step="0.01" {...editForm.register('price')} />
                         </div>
                         {perKgHint(editUnitType, editPriceBase, editPrice) && (
@@ -435,7 +437,7 @@ const Products = () => {
                           <input id={`edit-promoPrice-${product.id}`} type="number" step="0.01" {...editForm.register('promoPrice')} />
                         </div>
                         <div className="field">
-                          <label htmlFor={`edit-cost-${product.id}`}>Costo</label>
+                          <label htmlFor={`edit-cost-${product.id}`}>Costo<RequiredMark /></label>
                           <input id={`edit-cost-${product.id}`} type="number" step="0.01" {...editForm.register('cost')} />
                         </div>
                         <div className="field">
@@ -473,6 +475,7 @@ const Products = () => {
                           <button type="submit">Guardar</button>
                           <button type="button" onClick={() => setEditingId(null)}>Cancelar</button>
                         </div>
+                        <RequiredLegend />
                       </form>
                     </td>
                   ) : (

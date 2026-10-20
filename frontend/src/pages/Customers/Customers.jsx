@@ -8,6 +8,7 @@ import { saveBlob, filenameFromResponse, errorMessageFrom } from '../../utils/do
 import Spinner from '../../components/common/Spinner.jsx';
 import SearchInput from '../../components/common/SearchInput.jsx';
 import { matchesSearch } from '../../utils/search.js';
+import { RequiredMark, RequiredLegend } from '../../components/common/Required.jsx';
 
 const api = {
   getAll: customersApi.getCustomers,
@@ -137,7 +138,7 @@ const Customers = () => {
 
         {personType === 'business' ? (
           <div className="field">
-            <label htmlFor="businessName">Razón social</label>
+            <label htmlFor="businessName">Razón social<RequiredMark /></label>
             <input
               id="businessName"
               placeholder="Ej: Distribuidora del Sur SA"
@@ -148,7 +149,7 @@ const Customers = () => {
         ) : (
           <>
             <div className="field">
-              <label htmlFor="firstName">Nombre</label>
+              <label htmlFor="firstName">Nombre<RequiredMark /></label>
               <input
                 id="firstName"
                 placeholder="Ej: Juan"
@@ -164,7 +165,7 @@ const Customers = () => {
         )}
 
         <div className="field">
-          <label htmlFor="fiscalCondition">Condición fiscal</label>
+          <label htmlFor="fiscalCondition">Condición fiscal<RequiredMark /></label>
           <select id="fiscalCondition" {...register('fiscalCondition', { required: 'La condición fiscal es obligatoria' })}>
             <option value="">Elegí una opción...</option>
             {FISCAL_CONDITIONS.map((fc) => (
@@ -204,6 +205,7 @@ const Customers = () => {
         </div>
 
         <button type="submit">Agregar cliente</button>
+        <RequiredLegend />
       </form>
 
       <SearchInput
@@ -251,7 +253,7 @@ const Customers = () => {
                         <input id={`edit-lastName-${customer.id}`} placeholder="Ej: Pérez" {...editForm.register('lastName')} />
                       </div>
                       <div className="field">
-                        <label htmlFor={`edit-fiscalCondition-${customer.id}`}>Condición fiscal</label>
+                        <label htmlFor={`edit-fiscalCondition-${customer.id}`}>Condición fiscal<RequiredMark /></label>
                         <select id={`edit-fiscalCondition-${customer.id}`} {...editForm.register('fiscalCondition')}>
                           {FISCAL_CONDITIONS.map((fc) => (
                             <option key={fc} value={fc}>{fc}</option>
@@ -290,6 +292,7 @@ const Customers = () => {
                         <button type="submit">Guardar</button>
                         <button type="button" onClick={() => setEditingId(null)}>Cancelar</button>
                       </div>
+                      <RequiredLegend />
                     </form>
                   </td>
                 ) : (

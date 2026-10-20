@@ -5,6 +5,7 @@ import * as suppliersApi from '../../api/suppliers.api.js';
 import Spinner from '../../components/common/Spinner.jsx';
 import SearchInput from '../../components/common/SearchInput.jsx';
 import { matchesSearch } from '../../utils/search.js';
+import { RequiredMark, RequiredLegend } from '../../components/common/Required.jsx';
 
 const api = {
   getAll: suppliersApi.getSuppliers,
@@ -62,7 +63,7 @@ const Suppliers = () => {
 
       <form onSubmit={handleSubmit(onCreate)} className="supplier-form">
         <div className="field">
-          <label htmlFor="name">Nombre / Razón social</label>
+          <label htmlFor="name">Nombre / Razón social<RequiredMark /></label>
           <input id="name" placeholder="Ej: Distribuidora Central" {...register('name', { required: 'El nombre es obligatorio' })} />
           {errors.name && <span className="error">{errors.name.message}</span>}
         </div>
@@ -103,6 +104,7 @@ const Suppliers = () => {
         </div>
 
         <button type="submit">Agregar proveedor</button>
+        <RequiredLegend />
       </form>
 
       <SearchInput
@@ -138,7 +140,7 @@ const Suppliers = () => {
                   <td colSpan={5} className="edit-cell">
                     <form onSubmit={editForm.handleSubmit(onUpdate)} className="inline-edit-form">
                       <div className="field">
-                        <label htmlFor={`edit-name-${supplier.id}`}>Nombre</label>
+                        <label htmlFor={`edit-name-${supplier.id}`}>Nombre<RequiredMark /></label>
                         <input id={`edit-name-${supplier.id}`} {...editForm.register('name')} />
                       </div>
                       <div className="field">
@@ -173,6 +175,7 @@ const Suppliers = () => {
                         <button type="submit">Guardar</button>
                         <button type="button" onClick={() => setEditingId(null)}>Cancelar</button>
                       </div>
+                      <RequiredLegend />
                     </form>
                   </td>
                 ) : (

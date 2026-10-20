@@ -3,6 +3,7 @@ import { useForm, useFieldArray } from 'react-hook-form';
 import { useResource } from '../../hooks/useResource.js';
 import * as paymentsApi from '../../api/payments.api.js';
 import Spinner from '../../components/common/Spinner.jsx';
+import { RequiredMark, RequiredLegend } from '../../components/common/Required.jsx';
 
 const api = {
   getAll: paymentsApi.getPayments,
@@ -87,7 +88,7 @@ const Payments = () => {
 
       <form onSubmit={handleSubmit(onCreate)} className="payment-form">
         <div className="field">
-          <label htmlFor="name">Nombre</label>
+          <label htmlFor="name">Nombre<RequiredMark /></label>
           <input
             id="name"
             placeholder="Ej: Tarjeta de crédito"
@@ -144,6 +145,7 @@ const Payments = () => {
         )}
 
         <button type="submit">Agregar forma de pago</button>
+        <RequiredLegend />
       </form>
 
       <div className="table-wrapper">
@@ -163,7 +165,7 @@ const Payments = () => {
                   <td colSpan={4} className="edit-cell">
                     <form onSubmit={editForm.handleSubmit(onUpdate)} className="inline-edit-form">
                       <div className="field">
-                        <label htmlFor={`edit-name-${payment.id}`}>Nombre</label>
+                        <label htmlFor={`edit-name-${payment.id}`}>Nombre<RequiredMark /></label>
                         <input
                           id={`edit-name-${payment.id}`}
                           placeholder="Ej: Tarjeta de crédito"
@@ -232,6 +234,7 @@ const Payments = () => {
                         <button type="submit">Guardar</button>
                         <button type="button" onClick={() => setEditingId(null)}>Cancelar</button>
                       </div>
+                      <RequiredLegend />
                     </form>
                   </td>
                 ) : (

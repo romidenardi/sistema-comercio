@@ -5,6 +5,7 @@ import { useToast } from '../../context/ToastContext.jsx';
 import SearchSelect from '../../components/common/SearchSelect.jsx';
 import SearchInput from '../../components/common/SearchInput.jsx';
 import { matchesSearch } from '../../utils/search.js';
+import { RequiredMark, RequiredLegend } from '../../components/common/Required.jsx';
 
 const money = (value) => `$${(Number(value) || 0).toFixed(2)}`;
 
@@ -76,7 +77,7 @@ const ComboForm = ({
   return (
     <form onSubmit={handleSubmit(submit)} className={className}>
       <div className="field">
-        <label htmlFor={`${idPrefix}-internalCode`}>Código interno</label>
+        <label htmlFor={`${idPrefix}-internalCode`}>Código interno<RequiredMark /></label>
         <input
           id={`${idPrefix}-internalCode`}
           placeholder="Ej: C001"
@@ -96,7 +97,7 @@ const ComboForm = ({
       </div>
 
       <div className="field">
-        <label htmlFor={`${idPrefix}-name`}>Combo</label>
+        <label htmlFor={`${idPrefix}-name`}>Combo<RequiredMark /></label>
         <input
           id={`${idPrefix}-name`}
           placeholder="Ej: Pack cerveza + maní"
@@ -148,7 +149,7 @@ const ComboForm = ({
           {fields.map((field, index) => (
             <div key={field.id} className="purchase-item-row">
               <div className="field">
-                <label htmlFor={`${idPrefix}-component-${index}`}>Producto</label>
+                <label htmlFor={`${idPrefix}-component-${index}`}>Producto<RequiredMark /></label>
                 <Controller
                   name={`components.${index}.productId`}
                   control={control}
@@ -169,7 +170,7 @@ const ComboForm = ({
                 />
               </div>
               <div className="field">
-                <label htmlFor={`${idPrefix}-quantity-${index}`}>Cantidad</label>
+                <label htmlFor={`${idPrefix}-quantity-${index}`}>Cantidad<RequiredMark /></label>
                 <input
                   id={`${idPrefix}-quantity-${index}`}
                   type="number"
@@ -212,6 +213,7 @@ const ComboForm = ({
         <button type="submit">{submitLabel}</button>
         {onCancel && <button type="button" onClick={onCancel}>Cancelar</button>}
       </div>
+      <RequiredLegend />
     </form>
   );
 };

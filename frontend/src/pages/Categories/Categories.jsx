@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form';
 import { useResource } from '../../hooks/useResource.js';
 import * as categoriesApi from '../../api/categories.api.js';
 import Spinner from '../../components/common/Spinner.jsx';
+import { RequiredMark, RequiredLegend } from '../../components/common/Required.jsx';
 
 const api = {
   getAll: categoriesApi.getCategories,
@@ -53,7 +54,7 @@ const Categories = () => {
 
       <form onSubmit={handleSubmit(onCreate)} className="category-form">
         <div className="field">
-          <label htmlFor="name">Nombre</label>
+          <label htmlFor="name">Nombre<RequiredMark /></label>
           <input
             id="name"
             placeholder="Ej: Bebidas"
@@ -73,6 +74,7 @@ const Categories = () => {
         </div>
 
         <button type="submit">Agregar categoría</button>
+        <RequiredLegend />
       </form>
 
       <div className="table-wrapper">
@@ -91,7 +93,7 @@ const Categories = () => {
                     <td className="edit-cell">
                       <form onSubmit={editForm.handleSubmit(onUpdate)} className="inline-edit-form">
                         <div className="field">
-                          <label htmlFor={`edit-name-${category.id}`}>Nombre</label>
+                          <label htmlFor={`edit-name-${category.id}`}>Nombre<RequiredMark /></label>
                           <input id={`edit-name-${category.id}`} {...editForm.register('name', { required: true })} />
                         </div>
                         <div className="field">
@@ -107,6 +109,7 @@ const Categories = () => {
                           <button type="submit">Guardar</button>
                           <button type="button" onClick={() => setEditingId(null)}>Cancelar</button>
                         </div>
+                        <RequiredLegend />
                       </form>
                     </td>
                   ) : (
@@ -127,7 +130,7 @@ const Categories = () => {
                       <td className="edit-cell">
                         <form onSubmit={editForm.handleSubmit(onUpdate)} className="inline-edit-form">
                           <div className="field">
-                            <label htmlFor={`edit-name-${sub.id}`}>Nombre</label>
+                            <label htmlFor={`edit-name-${sub.id}`}>Nombre<RequiredMark /></label>
                             <input id={`edit-name-${sub.id}`} {...editForm.register('name', { required: true })} />
                           </div>
                           <div className="field">
@@ -143,6 +146,7 @@ const Categories = () => {
                             <button type="submit">Guardar</button>
                             <button type="button" onClick={() => setEditingId(null)}>Cancelar</button>
                           </div>
+                          <RequiredLegend />
                         </form>
                       </td>
                     ) : (

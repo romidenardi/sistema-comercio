@@ -4,6 +4,7 @@ import { useResource } from '../../hooks/useResource.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import * as usersApi from '../../api/users.api.js';
 import Spinner from '../../components/common/Spinner.jsx';
+import { RequiredMark, RequiredLegend } from '../../components/common/Required.jsx';
 
 const api = {
   getAll: usersApi.getUsers,
@@ -147,7 +148,7 @@ const UsersContent = ({ notice, setNotice, reload }) => {
 
       <form onSubmit={handleSubmit(onCreate)} className="user-form">
         <div className="field">
-          <label htmlFor="name">Nombre</label>
+          <label htmlFor="name">Nombre<RequiredMark /></label>
           <input
             id="name"
             placeholder="Ej: María Gómez"
@@ -157,7 +158,7 @@ const UsersContent = ({ notice, setNotice, reload }) => {
         </div>
 
         <div className="field">
-          <label htmlFor="email">Email</label>
+          <label htmlFor="email">Email<RequiredMark /></label>
           <input
             id="email"
             type="email"
@@ -168,7 +169,7 @@ const UsersContent = ({ notice, setNotice, reload }) => {
         </div>
 
         <div className="field field-full">
-          <label htmlFor="role">Rol</label>
+          <label htmlFor="role">Rol<RequiredMark /></label>
           <select id="role" {...register('role', { required: true })}>
             {ROLES.map((r) => (
               <option key={r.value} value={r.value}>{r.label}</option>
@@ -186,7 +187,7 @@ const UsersContent = ({ notice, setNotice, reload }) => {
 
         {mode === 'password' && (
           <div className="field">
-            <label htmlFor="password">Contraseña</label>
+            <label htmlFor="password">Contraseña<RequiredMark /></label>
             <input
               id="password"
               type="password"
@@ -204,6 +205,7 @@ const UsersContent = ({ notice, setNotice, reload }) => {
         <button type="submit">
           {mode === 'invite' ? 'Crear y enviar invitación' : 'Agregar usuario'}
         </button>
+        <RequiredLegend />
       </form>
 
       <div className="table-wrapper">
@@ -231,11 +233,11 @@ const UsersContent = ({ notice, setNotice, reload }) => {
                     <td colSpan={5} className="edit-cell">
                       <form onSubmit={editForm.handleSubmit(onUpdate)} className="inline-edit-form">
                         <div className="field">
-                          <label htmlFor={`edit-name-${user.id}`}>Nombre</label>
+                          <label htmlFor={`edit-name-${user.id}`}>Nombre<RequiredMark /></label>
                           <input id={`edit-name-${user.id}`} {...editForm.register('name', { required: true })} />
                         </div>
                         <div className="field">
-                          <label htmlFor={`edit-email-${user.id}`}>Email</label>
+                          <label htmlFor={`edit-email-${user.id}`}>Email<RequiredMark /></label>
                           <input id={`edit-email-${user.id}`} type="email" {...editForm.register('email', { required: true })} />
                         </div>
                         <div className="field">
@@ -270,6 +272,7 @@ const UsersContent = ({ notice, setNotice, reload }) => {
                         {isSelf && (
                           <span className="error">No podés cambiar tu propio rol ni desactivarte.</span>
                         )}
+                        <RequiredLegend />
                       </form>
                     </td>
                   ) : (

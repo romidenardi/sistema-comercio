@@ -11,6 +11,7 @@ import SearchSelect from '../../components/common/SearchSelect.jsx';
 import VatSelect from '../../components/common/VatSelect.jsx';
 import { toPercentOrNull } from '../../utils/taxes.js';
 import { formatQuantity, quantityStep, quantityMin, toKg } from '../../utils/quantity.js';
+import { RequiredMark, RequiredLegend } from '../../components/common/Required.jsx';
 
 const NEW_SUPPLIER = '__new_supplier__';
 const NEW_PRODUCT = '__new_product__';
@@ -219,7 +220,7 @@ const Purchases = () => {
 
       <form onSubmit={handleSubmit(onSubmit)} className="purchase-form">
         <div className="field">
-          <label htmlFor="supplierId">Proveedor</label>
+          <label htmlFor="supplierId">Proveedor<RequiredMark /></label>
           <Controller
             name="supplierId"
             control={control}
@@ -244,7 +245,7 @@ const Purchases = () => {
         {isNewSupplier && (
           <div className="inline-customer-form">
             <div className="field">
-              <label htmlFor="newSupplierName">Nombre</label>
+              <label htmlFor="newSupplierName">Nombre<RequiredMark /></label>
               <input id="newSupplierName" placeholder="Ej: Distribuidora Norte SRL" {...register('newSupplier.name')} />
             </div>
             <div className="field">
@@ -282,7 +283,7 @@ const Purchases = () => {
             return (
               <div key={field.id} className="purchase-item-row">
                 <div className="field">
-                  <label htmlFor={`item-product-${index}`}>Producto</label>
+                  <label htmlFor={`item-product-${index}`}>Producto<RequiredMark /></label>
                   <Controller
                     name={`items.${index}.productId`}
                     control={control}
@@ -304,7 +305,7 @@ const Purchases = () => {
                   />
                 </div>
                 <div className="field">
-                  <label htmlFor={`item-quantity-${index}`}>Cantidad</label>
+                  <label htmlFor={`item-quantity-${index}`}>Cantidad<RequiredMark /></label>
                   <div className={rowUnitType === 'weight' ? 'input-with-action' : undefined}>
                     <input
                       id={`item-quantity-${index}`}
@@ -326,7 +327,7 @@ const Purchases = () => {
                 </div>
                 <div className="field">
                   <label htmlFor={`item-unitCost-${index}`}>
-                    {rowUnitType === 'weight' ? 'Costo por kg' : 'Costo unitario'}
+                    {rowUnitType === 'weight' ? 'Costo por kg' : 'Costo unitario'}<RequiredMark />
                   </label>
                   <input
                     id={`item-unitCost-${index}`}
@@ -359,7 +360,7 @@ const Purchases = () => {
                 {isNewProduct && (
                   <div className="inline-customer-form field-full">
                     <div className="field">
-                      <label htmlFor={`new-product-code-${index}`}>Código interno</label>
+                      <label htmlFor={`new-product-code-${index}`}>Código interno<RequiredMark /></label>
                       <input
                         id={`new-product-code-${index}`}
                         placeholder="Ej: P001"
@@ -374,7 +375,7 @@ const Purchases = () => {
                       />
                     </div>
                     <div className="field">
-                      <label htmlFor={`new-product-name-${index}`}>Producto</label>
+                      <label htmlFor={`new-product-name-${index}`}>Producto<RequiredMark /></label>
                       <input
                         id={`new-product-name-${index}`}
                         placeholder="Ej: Cerveza IPA 500ml"
@@ -382,7 +383,7 @@ const Purchases = () => {
                       />
                     </div>
                     <div className="field">
-                      <label htmlFor={`new-product-price-${index}`}>{rowUnitType === 'weight' ? 'Precio de venta por kg' : 'Precio de venta'}</label>
+                      <label htmlFor={`new-product-price-${index}`}>{rowUnitType === 'weight' ? 'Precio de venta por kg' : 'Precio de venta'}<RequiredMark /></label>
                       <input
                         id={`new-product-price-${index}`}
                         type="number"
@@ -437,6 +438,7 @@ const Purchases = () => {
         <div className="purchase-total">Total: ${total.toFixed(2)}</div>
 
         <button type="submit">Registrar compra</button>
+        <RequiredLegend />
       </form>
 
       <div className="table-wrapper">
