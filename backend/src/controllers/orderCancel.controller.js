@@ -3,6 +3,7 @@ import {
 } from '../models/index.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { httpError } from '../utils/httpError.js';
+import { round3 } from '../utils/numbers.js';
 
 const arDate = (date) =>
   new Date(date).toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' });
@@ -10,7 +11,11 @@ const arDate = (date) =>
 const orderIncludes = [
   { model: Customer },
   { model: Payment, attributes: ['id', 'name'] },
-  { model: OrderItem, as: 'items', include: [{ model: Product, attributes: ['id', 'name', 'internalCode'] }] },
+  {
+    model: OrderItem,
+    as: 'items',
+    include: [{ model: Product, attributes: ['id', 'name', 'internalCode', 'unitType'] }],
+  },
 ];
 
 export const cancelOrder = asyncHandler(async (req, res) => {
@@ -38,7 +43,7 @@ export const cancelOrder = asyncHandler(async (req, res) => {
 
     const quantityByProduct = new Map();
     const addBack = (productId, quantity) => {
-      quantityByProduct.set(productId, (quantityByProduct.get(productId) || 0) + quantity);
+      quantityByProduct.set(productId, round3((quantityByProduct.get(productId) || 0) + quantity));
     };
     for (const item of items) {
       if (Array.isArray(item.components) && item.components.length) {
@@ -66,7 +71,7 @@ export const cancelOrder = asyncHandler(async (req, res) => {
         reason: `Anulación de remito del ${arDate(order.date)} a ${customerName}`,
       }, { transaction: t });
 
-      product.stock += quantity;
+      product.stock = round3(product.stock + quantity);
       await product.save({ transaction: t });
     }
 

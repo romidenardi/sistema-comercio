@@ -14,3 +14,24 @@ export const isNonNegative = (v) => {
 };
 
 export const round2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
+
+export const round3 = (n) => Math.round((n + Number.EPSILON) * 1000) / 1000;
+
+const MAX_QUANTITY = 999999999;
+
+export const hasMaxThreeDecimals = (n) => Math.abs(n * 1000 - Math.round(n * 1000)) < 1e-6;
+
+export const isPositiveQuantity = (v) => {
+  const n = toNumber(v);
+  return Number.isFinite(n) && n > 0 && n < MAX_QUANTITY && hasMaxThreeDecimals(n);
+};
+
+export const isNonNegativeQuantity = (v) => {
+  const n = toNumber(v);
+  return Number.isFinite(n) && n >= 0 && n < MAX_QUANTITY && hasMaxThreeDecimals(n);
+};
+
+export const quantityAllowedFor = (product, quantity) =>
+  product.unitType === 'weight' || Number.isInteger(quantity);
+
+export const unitWord = (product) => (product.unitType === 'weight' ? 'kg' : 'unidades');

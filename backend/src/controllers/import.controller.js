@@ -44,27 +44,43 @@ export const importProducts = asyncHandler(async (req, res) => {
       price: Number(getField(row, 'Precio') || 0),
       cost: Number(getField(row, 'Costo') || 0),
       unitType: (String(getField(row, 'Unidad') || 'unidad').trim().toLowerCase() === 'peso') ? 'weight' : 'unit',
+      scalePlu: String(getField(row, 'PLU Balanza', 'PLU')).trim(),
     }),
     validateRow: (data) => {
       if (!data.internalCode) return 'Falta el código interno';
       if (!data.name) return 'Falta el nombre';
       if (isNaN(data.price) || data.price < 0) return 'Precio inválido';
       if (isNaN(data.cost) || data.cost < 0) return 'Costo inválido';
+      if (data.scalePlu) {
+        const plu = Number(data.scalePlu);
+        if (!Number.isInteger(plu) || plu < 1 || plu > 9999) return 'PLU de balanza inválido (entero entre 1 y 9999)';
+        if (data.unitType !== 'weight') return 'El PLU de balanza solo se usa con productos por peso (Unidad = peso)';
+      }
       return null;
     },
     createFn: async (data) => {
       const category = categories.find((c) => c.name.toLowerCase() === data.categoryName.toLowerCase());
-      await Product.create({
-        internalCode: data.internalCode,
-        barcode: data.barcode,
-        name: data.name,
-        brand: data.brand,
-        price: data.price,
-        cost: data.cost,
-        unitType: data.unitType,
-        categoryId: category ? category.id : null,
-        businessId: req.user.businessId,
-      });
+      try {
+        await Product.create({
+          internalCode: data.internalCode,
+          barcode: data.barcode,
+          name: data.name,
+          brand: data.brand,
+          price: data.price,
+          cost: data.cost,
+          unitType: data.unitType,
+          scalePlu: data.scalePlu ? Number(data.scalePlu) : null,
+          categoryId: category ? category.id : null,
+          businessId: req.user.businessId,
+        });
+      } catch (err) {
+        if (err?.name === 'SequelizeUniqueConstraintError') {
+          const detail = `${err?.parent?.sqlMessage || ''} ${Object.keys(err?.fields || {}).join(' ')}`;
+          if (/scale_plu/i.test(detail)) throw new Error(`El PLU de balanza ${data.scalePlu} ya está asignado a otro producto`);
+          if (/barcode/i.test(detail)) throw new Error('El código de barras ya está asignado a otro producto');
+        }
+        throw err;
+      }
     },
   });
 

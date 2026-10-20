@@ -5,6 +5,7 @@ import { getOrders, createOrder, cancelOrder } from '../../api/orders.api.js';
 import { getCustomers, createCustomer } from '../../api/customers.api.js';
 import { getPayments } from '../../api/payments.api.js';
 import { getProducts, createProduct } from '../../api/products.api.js';
+import { getScaleConfig } from '../../api/scale.api.js';
 import { useToast } from '../../context/ToastContext.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
 import Spinner from '../../components/common/Spinner.jsx';
@@ -12,6 +13,10 @@ import ScanBar from '../../components/common/ScanBar.jsx';
 import SearchSelect from '../../components/common/SearchSelect.jsx';
 import VatSelect from '../../components/common/VatSelect.jsx';
 import { splitPrice, splitLineParts, toPercentOrNull } from '../../utils/taxes.js';
+import { parseScaleCode, lineFromLabel, resolveScaleConfig } from '../../utils/scale.js';
+import {
+  formatQuantity, quantityStep, quantityMin, round3, toKg,
+} from '../../utils/quantity.js';
 
 const NEW_CUSTOMER = '__new__';
 const NEW_PRODUCT = '__new_product__';
@@ -21,6 +26,7 @@ const FISCAL_CONDITIONS_WITH_VAT_BREAKDOWN = ['Responsable Inscripto'];
 const emptyItem = () => ({
   productId: '',
   quantity: 1,
+  qtyUnit: 'kg',
   unitPrice: 0,
   addStock: false,
   newProduct: { internalCode: '', barcode: '', name: '', cost: '', vatRate: '21', otherTaxes: '', unitType: 'unit' },
@@ -31,6 +37,7 @@ const Orders = () => {
   const [customers, setCustomers] = useState([]);
   const [payments, setPayments] = useState([]);
   const [products, setProducts] = useState([]);
+  const [scaleConfig, setScaleConfig] = useState(resolveScaleConfig(null));
   const [loading, setLoading] = useState(true);
   const [cancellingId, setCancellingId] = useState(null);
   const { showToast } = useToast();
@@ -63,12 +70,14 @@ const Orders = () => {
   const loadAll = async () => {
     setLoading(true);
     try {
-      const [ordersRes, customersRes, paymentsRes, productsRes] = await Promise.all([
+      const [ordersRes, customersRes, paymentsRes, productsRes, scaleRes] = await Promise.all([
         getOrders(),
         getCustomers(),
         getPayments(),
         getProducts(),
+        getScaleConfig().catch(() => ({ data: null })),
       ]);
+      setScaleConfig(resolveScaleConfig(scaleRes.data));
       setOrders(ordersRes.data);
       setCustomers(customersRes.data);
       setPayments(paymentsRes.data);
@@ -90,14 +99,14 @@ const Orders = () => {
 
   const requestedByProduct = (watchedItems || []).reduce((acc, item) => {
     if (!item.productId || item.productId === NEW_PRODUCT) return acc;
-    const quantity = Number(item.quantity) || 0;
+    const quantity = toKg(item.quantity, item.qtyUnit);
     const rowProduct = products.find((p) => p.id === item.productId);
     if (rowProduct?.isCombo) {
       (rowProduct.components || []).forEach((c) => {
-        acc[c.productId] = (acc[c.productId] || 0) + quantity * c.quantity;
+        acc[c.productId] = round3((acc[c.productId] || 0) + quantity * c.quantity);
       });
     } else {
-      acc[item.productId] = (acc[item.productId] || 0) + quantity;
+      acc[item.productId] = round3((acc[item.productId] || 0) + quantity);
     }
     return acc;
   }, {});
@@ -105,13 +114,13 @@ const Orders = () => {
   const getShortfall = (productId) => {
     const product = products.find((p) => p.id === productId);
     if (!product) return 0;
-    return Math.max((requestedByProduct[productId] || 0) - Number(product.stock), 0);
+    return round3(Math.max((requestedByProduct[productId] || 0) - Number(product.stock), 0));
   };
 
   const { grossSubtotal, grossVat, grossInternal, grossTotal } = (watchedItems || []).reduce((acc, item) => {
     const isNew = item.productId === NEW_PRODUCT;
     const product = isNew ? null : products.find((p) => p.id === item.productId);
-    const itemTotal = (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0);
+    const itemTotal = Math.round(toKg(item.quantity, item.qtyUnit) * (Number(item.unitPrice) || 0) * 100) / 100;
 
     const parts = product?.isCombo && (product.components || []).length
       ? splitLineParts(itemTotal, product.components)
@@ -157,6 +166,45 @@ const Orders = () => {
       setValue(`items.${index}.unitPrice`, Number(product.price));
     }
     setValue(`items.${index}.addStock`, false);
+    setValue(`items.${index}.qtyUnit`, 'kg');
+  };
+
+  // Etiqueta de balanza: trae el PLU del producto y el peso o el importe
+  const handleScaleLabel = (label) => {
+    const product = products.find((p) => !p.isCombo && p.scalePlu === label.plu);
+    if (!product) {
+      showToast(`No hay ningún producto con el PLU ${label.plu}. Cargalo en Productos → campo "PLU de balanza".`, 'error');
+      return;
+    }
+
+    const line = lineFromLabel(label, product);
+    if (line.noPrice || !(line.quantity > 0)) {
+      showToast(`${product.name} no tiene precio cargado: no se puede calcular la cantidad`, 'error');
+      return;
+    }
+
+    const items = watchedItems || [];
+    const existing = items.findIndex((it) => it.productId === product.id);
+    const emptyIndex = items.findIndex((it) => !it.productId);
+
+    if (existing >= 0) {
+      setValue(`items.${existing}.quantity`, round3(toKg(items[existing].quantity, items[existing].qtyUnit) + line.quantity));
+      setValue(`items.${existing}.qtyUnit`, 'kg');
+    } else if (emptyIndex >= 0) {
+      setValue(`items.${emptyIndex}.productId`, product.id);
+      onProductChange(emptyIndex, product.id);
+      setValue(`items.${emptyIndex}.quantity`, line.quantity);
+    } else {
+      append({ ...emptyItem(), productId: product.id, unitPrice: Number(product.price), quantity: line.quantity });
+    }
+
+    showToast(`${product.name}: ${formatQuantity(line.quantity, 'weight')} agregado`);
+    if (line.priceMismatch) {
+      showToast(
+        `El importe de la etiqueta ($${label.value.toFixed(2)}) no coincide con el precio de ${product.name} en el sistema. Revisá que sean iguales.`,
+        'error'
+      );
+    }
   };
 
   const handleScan = (rawCode) => {
@@ -166,6 +214,14 @@ const Orders = () => {
     const items = watchedItems || [];
     const emptyIndex = items.findIndex((it) => !it.productId);
     const product = products.find((p) => p.barcode === code || p.internalCode === code);
+
+    if (!product) {
+      const label = parseScaleCode(code, scaleConfig);
+      if (label) {
+        handleScaleLabel(label);
+        return;
+      }
+    }
 
     if (product) {
       const existing = items.findIndex((it) => it.productId === product.id);
@@ -270,7 +326,7 @@ const Orders = () => {
 
         payloadItems.push({
           productId,
-          quantity: Number(item.quantity),
+          quantity: toKg(item.quantity, item.qtyUnit),
           unitPrice: Number(item.unitPrice),
           addStock,
         });
@@ -314,7 +370,7 @@ const Orders = () => {
   const productOptions = products.map((p) => ({
     value: p.id,
     label: p.name,
-    detail: [p.isCombo && 'Combo', p.internalCode && `Cód. ${p.internalCode}`, `Stock: ${p.stock}`]
+    detail: [p.isCombo && 'Combo', p.internalCode && `Cód. ${p.internalCode}`, p.scalePlu && `PLU ${p.scalePlu}`, `Stock: ${formatQuantity(p.stock, p.unitType)}`]
       .filter(Boolean).join(' · '),
     keywords: [p.internalCode, p.barcode, p.brand, p.model],
   }));
@@ -460,7 +516,10 @@ const Orders = () => {
             const isNewProduct = rowProductId === NEW_PRODUCT;
             const rowProduct = products.find((p) => p.id === rowProductId);
             const isCombo = Boolean(rowProduct?.isCombo);
-            const rowQuantity = Number(watchedItems?.[index]?.quantity) || 0;
+            const rowUnitType = isNewProduct ? watchedItems?.[index]?.newProduct?.unitType : rowProduct?.unitType;
+            const rowQtyUnit = rowUnitType === 'weight' ? (watchedItems?.[index]?.qtyUnit || 'kg') : 'kg';
+            const rowQuantity = toKg(watchedItems?.[index]?.quantity, rowQtyUnit);
+            const rowPrice = Number(watchedItems?.[index]?.unitPrice) || 0;
             const shortfall = rowProductId && !isNewProduct && !isCombo ? getShortfall(rowProductId) : 0;
             const comboShortfall = isCombo ? Math.max(rowQuantity - Number(rowProduct.stock), 0) : 0;
 
@@ -493,15 +552,29 @@ const Orders = () => {
                 </div>
                 <div className="field">
                   <label htmlFor={`order-item-quantity-${index}`}>Cantidad</label>
-                  <input
-                    id={`order-item-quantity-${index}`}
-                    type="number"
-                    placeholder="Ej: 2"
-                    {...register(`items.${index}.quantity`, { required: true, min: 1 })}
-                  />
+                  <div className={rowUnitType === 'weight' ? 'input-with-action' : undefined}>
+                    <input
+                      id={`order-item-quantity-${index}`}
+                      type="number"
+                      step={rowQtyUnit === 'g' ? '1' : quantityStep(rowUnitType)}
+                      placeholder={rowUnitType === 'weight' ? (rowQtyUnit === 'g' ? 'Ej: 250' : 'Ej: 1,250') : 'Ej: 2'}
+                      {...register(`items.${index}.quantity`, {
+                        required: true,
+                        min: rowQtyUnit === 'g' ? 1 : quantityMin(rowUnitType),
+                      })}
+                    />
+                    {rowUnitType === 'weight' && (
+                      <select aria-label="Unidad de la cantidad" {...register(`items.${index}.qtyUnit`)}>
+                        <option value="kg">kg</option>
+                        <option value="g">g</option>
+                      </select>
+                    )}
+                  </div>
                 </div>
                 <div className="field">
-                  <label htmlFor={`order-item-price-${index}`}>Precio unitario</label>
+                  <label htmlFor={`order-item-price-${index}`}>
+                    {rowUnitType === 'weight' ? 'Precio por kg' : 'Precio unitario'}
+                  </label>
                   <input
                     id={`order-item-price-${index}`}
                     type="number"
@@ -521,6 +594,14 @@ const Orders = () => {
                     Quitar
                   </button>
                 </div>
+
+                {rowUnitType === 'weight' && rowQuantity > 0 && (
+                  <div className="field field-full">
+                    <small className="report-note">
+                      {formatQuantity(rowQuantity, 'weight')} × ${rowPrice.toFixed(2)} por kg = ${(Math.round(rowQuantity * rowPrice * 100) / 100).toFixed(2)}
+                    </small>
+                  </div>
+                )}
 
                 {isNewProduct && (
                   <div className="inline-customer-form field-full">
@@ -548,7 +629,7 @@ const Orders = () => {
                       />
                     </div>
                     <div className="field">
-                      <label htmlFor={`new-product-cost-${index}`}>Costo</label>
+                      <label htmlFor={`new-product-cost-${index}`}>{rowUnitType === 'weight' ? 'Costo por kg' : 'Costo'}</label>
                       <input
                         id={`new-product-cost-${index}`}
                         type="number"
@@ -586,7 +667,7 @@ const Orders = () => {
                     <div className="field field-full stock-warning">
                       <span>
                         El precio del producto será el "Precio unitario" de esta fila. Se crea con stock 0 y,
-                        al generar el remito, se cargan al stock las {rowQuantity} unidades de esta fila.
+                        al generar el remito, se cargan al stock {formatQuantity(rowQuantity, rowUnitType)} de esta fila.
                       </span>
                     </div>
                   </div>
@@ -603,7 +684,7 @@ const Orders = () => {
                 {comboShortfall > 0 && (
                   <div className="field field-full stock-warning">
                     <span>
-                      Stock insuficiente para el combo {rowProduct.name}: se pueden armar {Number(rowProduct.stock)},
+                      Stock insuficiente para el combo {rowProduct.name}: se pueden armar {formatQuantity(rowProduct.stock)},
                       pedís {rowQuantity}. Revisá el stock de los productos que lo forman.
                     </span>
                   </div>
@@ -612,12 +693,12 @@ const Orders = () => {
                 {shortfall > 0 && (
                   <div className="field field-full stock-warning">
                     <span>
-                      Stock insuficiente en {rowProduct?.name}: disponible {Number(rowProduct?.stock)}, faltan {shortfall}.
+                      Stock insuficiente en {rowProduct?.name}: disponible {formatQuantity(rowProduct?.stock, rowProduct?.unitType)}, faltan {formatQuantity(shortfall, rowProduct?.unitType)}.
                     </span>
                     {canManageData ? (
                       <label className="stock-warning-label">
                         <input type="checkbox" {...register(`items.${index}.addStock`)} />
-                        Cargar al stock las {shortfall} unidades que faltan al generar el remito.
+                        Cargar al stock {formatQuantity(shortfall, rowProduct?.unitType)} que faltan al generar el remito.
                       </label>
                     ) : (
                       <span>Pedile a un editor o administrador que cargue stock.</span>

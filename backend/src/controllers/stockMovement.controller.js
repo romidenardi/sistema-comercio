@@ -1,7 +1,9 @@
 import { StockMovement, Product, sequelize } from '../models/index.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { httpError } from '../utils/httpError.js';
-import { isPositiveInt, toNumber } from '../utils/numbers.js';
+import {
+  isPositiveQuantity, isNonNegativeQuantity, toNumber, round3, quantityAllowedFor,
+} from '../utils/numbers.js';
 
 export const getMovementsByProduct = asyncHandler(async (req, res) => {
   const { productId } = req.params;
@@ -25,12 +27,11 @@ export const createStockMovement = asyncHandler(async (req, res) => {
   if (!['in', 'out', 'adjustment'].includes(type)) throw httpError('Tipo de movimiento inválido');
 
   if (type === 'adjustment') {
-    const target = toNumber(newStock);
-    if (!Number.isInteger(target) || target < 0) {
-      throw httpError('El stock nuevo debe ser un entero mayor o igual a 0');
+    if (!isNonNegativeQuantity(newStock)) {
+      throw httpError('El stock nuevo debe ser un número mayor o igual a 0, con hasta 3 decimales');
     }
-  } else if (!isPositiveInt(quantity)) {
-    throw httpError('La cantidad debe ser un entero mayor a 0');
+  } else if (!isPositiveQuantity(quantity)) {
+    throw httpError('La cantidad debe ser un número mayor a 0, con hasta 3 decimales');
   }
 
   const t = await sequelize.transaction();
@@ -43,14 +44,19 @@ export const createStockMovement = asyncHandler(async (req, res) => {
     if (!product) throw httpError('Producto no encontrado', 404);
     if (product.isCombo) throw httpError('Un combo no tiene stock propio: se calcula con sus productos');
 
+    const amount = round3(toNumber(type === 'adjustment' ? newStock : quantity));
+    if (!quantityAllowedFor(product, amount)) {
+      throw httpError('Este producto se maneja por unidad: usá cantidades enteras');
+    }
+
     let delta;
     if (type === 'in') {
-      delta = toNumber(quantity);
+      delta = amount;
     } else if (type === 'out') {
-      delta = -toNumber(quantity);
-      if (product.stock + delta < 0) throw httpError('Stock insuficiente para este egreso');
+      delta = -amount;
+      if (round3(product.stock + delta) < 0) throw httpError('Stock insuficiente para este egreso');
     } else {
-      delta = toNumber(newStock) - product.stock;
+      delta = round3(amount - product.stock);
     }
 
     const movement = await StockMovement.create({
@@ -61,7 +67,7 @@ export const createStockMovement = asyncHandler(async (req, res) => {
       reason,
     }, { transaction: t });
 
-    product.stock += delta;
+    product.stock = round3(product.stock + delta);
     await product.save({ transaction: t });
 
     await t.commit();

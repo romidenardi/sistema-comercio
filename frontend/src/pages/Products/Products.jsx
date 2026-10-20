@@ -8,9 +8,11 @@ import BarcodeScanner from '../../components/common/BarcodeScanner.jsx';
 import Spinner from '../../components/common/Spinner.jsx';
 import SearchInput from '../../components/common/SearchInput.jsx';
 import Combos from './Combos.jsx';
+import ScaleSettings from './ScaleSettings.jsx';
 import { matchesSearch } from '../../utils/search.js';
 import VatSelect from '../../components/common/VatSelect.jsx';
 import { toPercentOrNull, vatToFormValue } from '../../utils/taxes.js';
+import { formatQuantity, PRICE_BASES, toPricePerKg, perKg } from '../../utils/quantity.js';
 
 const api = {
   getAll: productsApi.getProducts,
@@ -25,15 +27,36 @@ const Products = () => {
   const [editingId, setEditingId] = useState(null);
   const [stockPanelId, setStockPanelId] = useState(null);
   const [search, setSearch] = useState('');
-  const [tab, setTab] = useState('products'); // 'products' | 'combos'
+  const [tab, setTab] = useState('products'); // 'products' | 'combos' | 'scale'
 
-  const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm({
-    defaultValues: { unitType: 'unit', vatRate: '21' },
+  const { register, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm({
+    defaultValues: { unitType: 'unit', vatRate: '21', priceBase: '1000' },
   });
   const editForm = useForm();
+  const createUnitType = watch('unitType');
+  const editUnitType = editForm.watch('unitType');
+  const createPriceBase = watch('priceBase');
+  const createPrice = watch('price');
+  const editPriceBase = editForm.watch('priceBase');
+  const editPrice = editForm.watch('price');
+
+  const money = (value) => `$${(Number(value) || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const perKgHint = (unitType, base, price) => {
+    if (unitType !== 'weight' || !price) return null;
+    const perKgPrice = toPricePerKg(price, base);
+    return `Se guarda como ${money(perKgPrice)} por kg (${money(perKgPrice / 10)} cada 100 g).`;
+  };
+  const priceFields = (formData) => {
+    const weight = formData.unitType === 'weight';
+    const convert = (v) => (weight ? toPricePerKg(v, formData.priceBase) : Number(v));
+    return {
+      price: convert(formData.price),
+      cost: convert(formData.cost),
+      promoPrice: formData.promoPrice ? convert(formData.promoPrice) : null,
+    };
+  };
   const [scanTarget, setScanTarget] = useState(null); // 'create' | 'edit' | null
 
-  // Los lectores mandan Enter al terminar: no debe enviar el formulario
   const blockEnter = (e) => {
     if (e.key === 'Enter') e.preventDefault();
   };
@@ -51,16 +74,16 @@ const Products = () => {
   const flatCategories = categories.flatMap((c) => [c, ...(c.subcategories || [])]);
 
   const onCreate = async (formData) => {
+    const { priceBase: _base, ...rest } = formData;
     const result = await create({
-      ...formData,
-      price: Number(formData.price),
-      cost: Number(formData.cost),
-      promoPrice: formData.promoPrice ? Number(formData.promoPrice) : null,
+      ...rest,
+      ...priceFields(formData),
       vatRate: Number(formData.vatRate),
       otherTaxes: toPercentOrNull(formData.otherTaxes),
       categoryId: formData.categoryId || null,
+      scalePlu: formData.unitType === 'weight' && formData.scalePlu ? Number(formData.scalePlu) : null,
     });
-    if (result.success) reset({ unitType: 'unit', vatRate: '21' });
+    if (result.success) reset({ unitType: 'unit', vatRate: '21', priceBase: '1000' });
   };
 
   const startEdit = (product) => {
@@ -74,6 +97,8 @@ const Products = () => {
       model: product.model || '',
       categoryId: product.categoryId || '',
       unitType: product.unitType || 'unit',
+      scalePlu: product.scalePlu ?? '',
+      priceBase: '1000',
       price: product.price,
       promoPrice: product.promoPrice || '',
       cost: product.cost,
@@ -85,14 +110,14 @@ const Products = () => {
   };
 
   const onUpdate = async (formData) => {
+    const { priceBase: _base, ...rest } = formData;
     const result = await update(editingId, {
-      ...formData,
-      price: Number(formData.price),
-      cost: Number(formData.cost),
-      promoPrice: formData.promoPrice ? Number(formData.promoPrice) : null,
+      ...rest,
+      ...priceFields(formData),
       vatRate: Number(formData.vatRate),
       otherTaxes: toPercentOrNull(formData.otherTaxes),
       categoryId: formData.categoryId || null,
+      scalePlu: formData.unitType === 'weight' && formData.scalePlu ? Number(formData.scalePlu) : null,
       active: formData.active === 'true',
     });
     if (result.success) setEditingId(null);
@@ -118,6 +143,9 @@ const Products = () => {
       <button type="button" role="tab" aria-selected={tab === 'combos'} className={tab === 'combos' ? 'active' : ''} onClick={() => setTab('combos')}>
         Combos
       </button>
+      <button type="button" role="tab" aria-selected={tab === 'scale'} className={tab === 'scale' ? 'active' : ''} onClick={() => setTab('scale')}>
+        Balanza
+      </button>
     </div>
   );
 
@@ -129,6 +157,16 @@ const Products = () => {
         <h1>Productos</h1>
         {tabs}
         <Combos products={products} categories={flatCategories} onChanged={reload} />
+      </div>
+    );
+  }
+
+  if (tab === 'scale') {
+    return (
+      <div className="products-page">
+        <h1>Productos</h1>
+        {tabs}
+        <ScaleSettings products={products} />
       </div>
     );
   }
@@ -199,10 +237,40 @@ const Products = () => {
           </select>
         </div>
 
+        {createUnitType === 'weight' && (
+          <div className="field">
+            <label htmlFor="scalePlu">PLU de balanza <small>(opcional)</small></label>
+            <input
+              id="scalePlu"
+              type="number"
+              min="1"
+              max="9999"
+              step="1"
+              placeholder="Ej: 417"
+              {...register('scalePlu')}
+            />
+          </div>
+        )}
+
+        {createUnitType === 'weight' && (
+          <div className="field">
+            <label htmlFor="priceBase">Cargo precio y costo por</label>
+            <select id="priceBase" {...register('priceBase')}>
+              {PRICE_BASES.map((b) => <option key={b.value} value={b.value}>{b.label}</option>)}
+            </select>
+          </div>
+        )}
+
         <div className="field">
-          <label htmlFor="price">Precio</label>
+          <label htmlFor="price">Precio{createUnitType === 'weight' ? ' (por la cantidad elegida)' : ''}</label>
           <input id="price" type="number" step="0.01" placeholder="Ej: 1500" {...register('price', { required: 'Obligatorio', min: 0 })} />
         </div>
+
+        {perKgHint(createUnitType, createPriceBase, createPrice) && (
+          <div className="field field-full">
+            <small className="report-note">{perKgHint(createUnitType, createPriceBase, createPrice)}</small>
+          </div>
+        )}
 
         <div className="field">
           <label htmlFor="promoPrice">Precio promocional</label>
@@ -331,10 +399,37 @@ const Products = () => {
                             <option value="weight">Por peso</option>
                           </select>
                         </div>
+                        {editUnitType === 'weight' && (
+                          <div className="field">
+                            <label htmlFor={`edit-scalePlu-${product.id}`}>PLU de balanza</label>
+                            <input
+                              id={`edit-scalePlu-${product.id}`}
+                              type="number"
+                              min="1"
+                              max="9999"
+                              step="1"
+                              placeholder="Ej: 417"
+                              {...editForm.register('scalePlu')}
+                            />
+                          </div>
+                        )}
+                        {editUnitType === 'weight' && (
+                          <div className="field">
+                            <label htmlFor={`edit-priceBase-${product.id}`}>Cargo precio y costo por</label>
+                            <select id={`edit-priceBase-${product.id}`} {...editForm.register('priceBase')}>
+                              {PRICE_BASES.map((b) => <option key={b.value} value={b.value}>{b.label}</option>)}
+                            </select>
+                          </div>
+                        )}
                         <div className="field">
-                          <label htmlFor={`edit-price-${product.id}`}>Precio</label>
+                          <label htmlFor={`edit-price-${product.id}`}>Precio{editUnitType === 'weight' ? ' (por la cantidad elegida)' : ''}</label>
                           <input id={`edit-price-${product.id}`} type="number" step="0.01" {...editForm.register('price')} />
                         </div>
+                        {perKgHint(editUnitType, editPriceBase, editPrice) && (
+                          <div className="field field-full">
+                            <small className="report-note">{perKgHint(editUnitType, editPriceBase, editPrice)}</small>
+                          </div>
+                        )}
                         <div className="field">
                           <label htmlFor={`edit-promoPrice-${product.id}`}>Precio promo</label>
                           <input id={`edit-promoPrice-${product.id}`} type="number" step="0.01" {...editForm.register('promoPrice')} />
@@ -383,12 +478,15 @@ const Products = () => {
                   ) : (
                     <>
                       <td data-label="Código">{product.internalCode}</td>
-                      <td data-label="Producto">{product.name}</td>
+                      <td data-label="Producto">
+                        {product.name}
+                        {product.scalePlu ? <small> · PLU {product.scalePlu}</small> : null}
+                      </td>
                       <td data-label="Categoría">{categoryName(product.categoryId)}</td>
-                      <td data-label="Precio">${Number(product.price).toFixed(2)}</td>
-                      <td data-label="Precio promo">{product.promoPrice ? `$${Number(product.promoPrice).toFixed(2)}` : '—'}</td>
-                      <td data-label="Costo">${Number(product.cost).toFixed(2)}</td>
-                      <td data-label="Stock">{product.stock}</td>
+                      <td data-label="Precio">${Number(product.price).toFixed(2)}{perKg(product.unitType)}</td>
+                      <td data-label="Precio promo">{product.promoPrice ? `$${Number(product.promoPrice).toFixed(2)}${perKg(product.unitType)}` : '—'}</td>
+                      <td data-label="Costo">${Number(product.cost).toFixed(2)}{perKg(product.unitType)}</td>
+                      <td data-label="Stock">{formatQuantity(product.stock, product.unitType)}</td>
                       <td data-label="Acciones">
                         <button onClick={() => startEdit(product)}>Editar</button>
                         <button onClick={() => onDelete(product.id)}>Eliminar</button>

@@ -18,7 +18,10 @@ const Business = sequelize.define('Business', {
   },
   trialEndsAt: { type: DataTypes.DATE, allowNull: true, field: 'trial_ends_at' },
   contactEmail: { type: DataTypes.STRING, allowNull: true, field: 'contact_email' },
+  // Fecha en que se borran definitivamente los datos (solo si status = closing)
   deleteAt: { type: DataTypes.DATE, allowNull: true, field: 'delete_at' },
+  // Formato de las etiquetas de la balanza del comercio (ver utils/scaleConfig.js)
+  scaleConfig: { type: DataTypes.JSON, allowNull: true, field: 'scale_config' },
 }, {
   tableName: 'businesses',
 });

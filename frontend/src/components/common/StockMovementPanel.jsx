@@ -3,6 +3,8 @@ import { useForm } from 'react-hook-form';
 import { getMovementsByProduct, createStockMovement } from '../../api/stockMovements.api.js';
 import { useToast } from '../../context/ToastContext.jsx';
 import Spinner from './Spinner.jsx';
+import { formatQuantity, formatSignedQuantity, quantityStep } from '../../utils/quantity.js';
+import { RequiredMark, RequiredLegend } from './Required.jsx';
 
 const StockMovementPanel = ({ product, onStockChange }) => {
   const [movements, setMovements] = useState([]);
@@ -49,7 +51,7 @@ const StockMovementPanel = ({ product, onStockChange }) => {
 
   return (
     <div className="stock-panel">
-      <h3>Stock actual: {product.stock}</h3>
+      <h3>Stock actual: {formatQuantity(product.stock, product.unitType)}</h3>
 
       <form onSubmit={handleSubmit(onSubmit)} className="stock-form">
         <div className="field">
@@ -63,12 +65,15 @@ const StockMovementPanel = ({ product, onStockChange }) => {
 
         <div className="field">
           <label htmlFor={`stock-value-${product.id}`}>
-            {type === 'adjustment' ? 'Stock real contado' : 'Cantidad'}
+            {type === 'adjustment' ? 'Stock real contado' : 'Cantidad'}<RequiredMark />
           </label>
           <input
             id={`stock-value-${product.id}`}
             type="number"
-            placeholder={type === 'adjustment' ? 'Ej: 24' : 'Ej: 10'}
+            step={quantityStep(product.unitType)}
+            placeholder={type === 'adjustment'
+              ? (product.unitType === 'weight' ? 'Ej: 24,500' : 'Ej: 24')
+              : (product.unitType === 'weight' ? 'Ej: 10,250' : 'Ej: 10')}
             {...register('value', { required: true, min: 0 })}
           />
         </div>
@@ -83,6 +88,7 @@ const StockMovementPanel = ({ product, onStockChange }) => {
         </div>
 
         <button type="submit">Registrar</button>
+        <RequiredLegend />
       </form>
 
       {loading ? (
@@ -103,7 +109,7 @@ const StockMovementPanel = ({ product, onStockChange }) => {
                 <tr key={m.id}>
                   <td data-label="Fecha">{new Date(m.date).toLocaleString('es-AR')}</td>
                   <td data-label="Tipo">{m.type}</td>
-                  <td data-label="Cambio">{m.quantity > 0 ? `+${m.quantity}` : m.quantity}</td>
+                  <td data-label="Cambio">{formatSignedQuantity(m.quantity, product.unitType)}</td>
                   <td data-label="Motivo">{m.reason || '—'}</td>
                 </tr>
               ))}

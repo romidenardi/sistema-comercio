@@ -5,7 +5,10 @@ import { asyncHandler } from '../utils/asyncHandler.js';
 import { httpError } from '../utils/httpError.js';
 import { splitPrice, splitLineParts } from '../utils/taxes.js';
 import { loadComboComponents } from '../services/combo.service.js';
-import { isPositiveInt, isNonNegative, toNumber, toNumberOrZero, round2 } from '../utils/numbers.js';
+import {
+  isPositiveQuantity, isNonNegative, toNumber, toNumberOrZero, round2, round3,
+  quantityAllowedFor, unitWord,
+} from '../utils/numbers.js';
 
 const FISCAL_CONDITIONS_WITH_VAT_BREAKDOWN = ['Responsable Inscripto'];
 const ROLES_THAT_CAN_ADD_STOCK = ['admin', 'editor'];
@@ -13,7 +16,11 @@ const ROLES_THAT_CAN_ADD_STOCK = ['admin', 'editor'];
 const orderIncludes = [
   { model: Customer },
   { model: Payment, attributes: ['id', 'name'] },
-  { model: OrderItem, as: 'items', include: [{ model: Product, attributes: ['id', 'name', 'internalCode'] }] },
+  {
+    model: OrderItem,
+    as: 'items',
+    include: [{ model: Product, attributes: ['id', 'name', 'internalCode', 'unitType'] }],
+  },
 ];
 
 export const getOrders = asyncHandler(async (req, res) => {
@@ -46,11 +53,13 @@ export const createOrder = asyncHandler(async (req, res) => {
   const rows = items.map((item, index) => {
     const n = index + 1;
     if (!item || !item.productId) throw httpError(`Artículo ${n}: falta el producto`);
-    if (!isPositiveInt(item.quantity)) throw httpError(`Artículo ${n}: la cantidad debe ser un entero mayor a 0`);
+    if (!isPositiveQuantity(item.quantity)) {
+      throw httpError(`Artículo ${n}: la cantidad debe ser un número mayor a 0, con hasta 3 decimales`);
+    }
     if (!isNonNegative(item.unitPrice)) throw httpError(`Artículo ${n}: el precio no es válido`);
     return {
       productId: item.productId,
-      quantity: toNumber(item.quantity),
+      quantity: round3(toNumber(item.quantity)),
       unitPrice: toNumber(item.unitPrice),
       addStock: item.addStock === true,
     };
@@ -88,8 +97,12 @@ export const createOrder = asyncHandler(async (req, res) => {
       transaction: t,
     });
     const rowProductMap = new Map(rowProducts.map((p) => [p.id, p]));
-    for (const row of rows) {
-      if (!rowProductMap.has(row.productId)) throw httpError(`Producto no encontrado: ${row.productId}`, 404);
+    for (const [index, row] of rows.entries()) {
+      const rowProduct = rowProductMap.get(row.productId);
+      if (!rowProduct) throw httpError(`Producto no encontrado: ${row.productId}`, 404);
+      if (!quantityAllowedFor(rowProduct, row.quantity)) {
+        throw httpError(`Artículo ${index + 1}: ${rowProduct.name} se vende por unidad, la cantidad debe ser un entero`);
+      }
     }
     const comboComponents = await loadComboComponents(
       rowProducts.filter((p) => p.isCombo).map((p) => p.id),
@@ -108,12 +121,12 @@ export const createOrder = asyncHandler(async (req, res) => {
         for (const component of components) {
           requested.set(
             component.productId,
-            (requested.get(component.productId) || 0) + row.quantity * component.quantity
+            round3((requested.get(component.productId) || 0) + row.quantity * component.quantity)
           );
           viaCombo.add(component.productId);
         }
       } else {
-        requested.set(row.productId, (requested.get(row.productId) || 0) + row.quantity);
+        requested.set(row.productId, round3((requested.get(row.productId) || 0) + row.quantity));
         if (row.addStock) addStockFor.add(row.productId);
       }
     }
@@ -127,7 +140,7 @@ export const createOrder = asyncHandler(async (req, res) => {
       });
       if (!product) throw httpError(`Producto no encontrado: ${productId}`, 404);
 
-      const shortfall = Math.max(qty - product.stock, 0);
+      const shortfall = round3(Math.max(qty - product.stock, 0));
       if (shortfall > 0) {
         if (!addStockFor.has(productId)) {
           const forCombo = viaCombo.has(productId) ? ' (necesario para un combo)' : '';
@@ -150,7 +163,7 @@ export const createOrder = asyncHandler(async (req, res) => {
     let grossInternal = 0;
     let grossTotal = 0;
     for (const row of rows) {
-      const itemTotal = row.quantity * row.unitPrice;
+      const itemTotal = round2(row.quantity * row.unitPrice);
       let parts;
       if (rowProductMap.get(row.productId).isCombo) {
         row.components = comboComponents.get(row.productId).map((c) => ({
@@ -236,7 +249,7 @@ export const createOrder = asyncHandler(async (req, res) => {
           productId: product.id,
           type: 'in',
           quantity: shortfall,
-          reason: `Ajuste desde remito a ${customerName}: faltaban ${shortfall} unidades`,
+          reason: `Ajuste desde remito a ${customerName}: faltaban ${shortfall} ${unitWord(product)}`,
         }, { transaction: t });
       }
 
@@ -248,7 +261,7 @@ export const createOrder = asyncHandler(async (req, res) => {
         reason: `Remito a cliente ${customerName}${viaCombo.has(product.id) ? ' (incluye combos)' : ''}`,
       }, { transaction: t });
 
-      product.stock = product.stock + shortfall - qty;
+      product.stock = round3(product.stock + shortfall - qty);
       await product.save({ transaction: t });
     }
 

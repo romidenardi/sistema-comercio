@@ -3,7 +3,7 @@ import { importProducts, importCustomers, importSuppliers } from '../../api/impo
 import { useToast } from '../../context/ToastContext.jsx';
 
 const IMPORT_TYPES = [
-  { key: 'products', label: 'Productos', fn: importProducts, columns: 'Código Interno, Nombre, Marca, Categoría, Precio, Costo, Unidad (unidad/peso)' },
+  { key: 'products', label: 'Productos', fn: importProducts, columns: 'Código Interno, Nombre, Marca, Categoría, Precio, Costo, Unidad (unidad/peso), PLU Balanza (opcional, solo para productos por peso). En productos por peso, Precio y Costo son por kg' },
   { key: 'customers', label: 'Clientes', fn: importCustomers, columns: 'Razón Social o Nombre/Apellido, Condición Fiscal, CUIT, Localidad, Provincia, Teléfono, Email' },
   { key: 'suppliers', label: 'Proveedores', fn: importSuppliers, columns: 'Nombre, CUIT, Contacto, Teléfono, Email, Localidad, Provincia' },
 ];

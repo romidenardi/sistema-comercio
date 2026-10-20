@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { getOrder } from '../../api/orders.api.js';
 import Spinner from '../../components/common/Spinner.jsx';
+import { formatQuantity, perKg } from '../../utils/quantity.js';
 
 const OrderPrint = () => {
   const { id } = useParams();
@@ -76,9 +77,9 @@ const OrderPrint = () => {
                     </small>
                   )}
                 </td>
-                <td>{item.quantity}</td>
-                <td>${Number(item.unitPrice).toFixed(2)}</td>
-                <td>${(item.quantity * item.unitPrice).toFixed(2)}</td>
+                <td>{formatQuantity(item.quantity, item.Product?.unitType)}</td>
+                <td>${Number(item.unitPrice).toFixed(2)}{perKg(item.Product?.unitType)}</td>
+                <td>${(Math.round(Number(item.quantity) * Number(item.unitPrice) * 100) / 100).toFixed(2)}</td>
               </tr>
             ))}
           </tbody>

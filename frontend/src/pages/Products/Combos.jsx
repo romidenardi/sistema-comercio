@@ -222,7 +222,8 @@ const Combos = ({ products, categories, onChanged }) => {
   const [search, setSearch] = useState('');
 
   const combos = products.filter((p) => p.isCombo);
-  const singles = products.filter((p) => !p.isCombo);
+
+  const singles = products.filter((p) => !p.isCombo && p.unitType !== 'weight');
 
   const categoryName = (categoryId) => categories.find((c) => c.id === categoryId)?.name || '—';
 

@@ -1,6 +1,7 @@
 import pkg from 'sequelize';
 const { DataTypes } = pkg;
 import sequelize from '../config/database.js';
+import { numericGetter } from '../utils/decimalColumn.js';
 
 const PurchaseItem = sequelize.define('PurchaseItem', {
   id: {
@@ -19,8 +20,9 @@ const PurchaseItem = sequelize.define('PurchaseItem', {
     field: 'product_id',
   },
   quantity: {
-    type: DataTypes.INTEGER,
+    type: DataTypes.DECIMAL(12, 3),
     allowNull: false,
+    get: numericGetter('quantity'),
   },
   unitCost: {
     type: DataTypes.DECIMAL(10, 2),

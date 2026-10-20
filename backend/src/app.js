@@ -7,6 +7,7 @@ import platformRoutes from './routes/platform.routes.js';
 import categoryRoutes from './routes/category.routes.js';
 import productRoutes from './routes/product.routes.js';
 import comboRoutes from './routes/combo.routes.js';
+import scaleRoutes from './routes/scale.routes.js';
 import stockMovementRoutes from './routes/stockMovement.routes.js';
 import paymentRoutes from './routes/payment.routes.js';
 import customerRoutes from './routes/customer.routes.js';
@@ -26,7 +27,7 @@ import { errorMiddleware } from './middlewares/error.middleware.js';
 
 const app = express();
 
-app.set('trust proxy', 1); // detrás del proxy de Railway
+app.set('trust proxy', 1); 
 
 const allowedOrigins = (process.env.CORS_ORIGIN || '')
   .split(',')
@@ -61,6 +62,7 @@ app.use('/api/platform', platformRoutes);
 app.use('/api/categories', authMiddleware, categoryRoutes);
 app.use('/api/products', authMiddleware, productRoutes);
 app.use('/api/combos', authMiddleware, comboRoutes);
+app.use('/api/scale-config', authMiddleware, scaleRoutes);
 app.use('/api/stock-movements', authMiddleware, stockMovementRoutes);
 app.use('/api/payments', authMiddleware, paymentRoutes);
 app.use('/api/customers', authMiddleware, customerRoutes);

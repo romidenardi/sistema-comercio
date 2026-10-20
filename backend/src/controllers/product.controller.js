@@ -22,8 +22,33 @@ const assertBarcodeFree = async (businessId, barcode, exceptId) => {
   }
 };
 
+// PLU de balanza: entero entre 1 y 9999 (vacío = sin PLU)
+const cleanScalePlu = (value) => {
+  if (value === undefined) return undefined;
+  if (value === null || String(value).trim() === '') return null;
+  const plu = Number(value);
+  if (!Number.isInteger(plu) || plu < 1 || plu > 9999) {
+    throw httpError('El PLU de balanza debe ser un número entero entre 1 y 9999');
+  }
+  return plu;
+};
+
+const assertScalePluFree = async (businessId, scalePlu, exceptId) => {
+  if (!scalePlu) return;
+  const where = { businessId, scalePlu };
+  if (exceptId) where.id = { [Op.ne]: exceptId };
+  const existing = await Product.findOne({ where });
+  if (existing) {
+    throw httpError(`El PLU de balanza ${scalePlu} ya está asignado a "${existing.name}"`, 409);
+  }
+};
+
 const rethrowDuplicate = (err) => {
   if (err?.name === 'SequelizeUniqueConstraintError') {
+    const detail = `${err?.parent?.sqlMessage || err?.original?.sqlMessage || ''} ${Object.keys(err?.fields || {}).join(' ')}`;
+    if (/scale_plu/i.test(detail)) {
+      throw httpError('Ese PLU de balanza ya está asignado a otro producto', 409);
+    }
     throw httpError('Ese código de barras ya está asignado a otro producto', 409);
   }
   throw err;
@@ -82,13 +107,19 @@ export const createProduct = asyncHandler(async (req, res) => {
   const barcode = cleanBarcode(req.body.barcode) ?? null;
   await assertBarcodeFree(businessId, barcode);
 
+  const scalePlu = cleanScalePlu(req.body.scalePlu) ?? null;
+  if (scalePlu && req.body.unitType !== 'weight') {
+    throw httpError('El PLU de balanza solo se puede asignar a productos por peso');
+  }
+  await assertScalePluFree(businessId, scalePlu);
+
   // Los combos se crean desde /combos: acá nunca
   const { isCombo: _ignoredCombo, specialPrice: _ignoredSpecial, ...body } = req.body;
   const data = normalizeTaxes({ ...body });
 
   let product;
   try {
-    product = await Product.create({ ...data, barcode, businessId });
+    product = await Product.create({ ...data, barcode, scalePlu, businessId });
   } catch (err) {
     rethrowDuplicate(err);
   }
@@ -99,7 +130,6 @@ export const updateProduct = asyncHandler(async (req, res) => {
   const { businessId } = req.user;
   const product = await findOwnProduct(req.params.id, businessId);
 
-  // Nunca se permite cambiar el comercio ni el id desde el pedido
   const {
     businessId: _ignoredBusiness, id: _ignoredId, isCombo: _ignoredCombo, specialPrice: _ignoredSpecial, ...data
   } = req.body;
@@ -111,6 +141,15 @@ export const updateProduct = asyncHandler(async (req, res) => {
     data.barcode = cleanBarcode(data.barcode) ?? null;
     await assertBarcodeFree(businessId, data.barcode, product.id);
   }
+
+  const finalUnitType = data.unitType ?? product.unitType;
+  if ('scalePlu' in data) data.scalePlu = cleanScalePlu(data.scalePlu) ?? null;
+  if (finalUnitType !== 'weight') {
+    if (data.scalePlu) throw httpError('El PLU de balanza solo se puede asignar a productos por peso');
+    // Si el producto deja de ser por peso, pierde su PLU
+    if (product.scalePlu) data.scalePlu = null;
+  }
+  if (data.scalePlu) await assertScalePluFree(businessId, data.scalePlu, product.id);
 
   try {
     await product.update(data);

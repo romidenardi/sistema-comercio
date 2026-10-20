@@ -10,6 +10,7 @@ import ScanBar from '../../components/common/ScanBar.jsx';
 import SearchSelect from '../../components/common/SearchSelect.jsx';
 import VatSelect from '../../components/common/VatSelect.jsx';
 import { toPercentOrNull } from '../../utils/taxes.js';
+import { formatQuantity, quantityStep, quantityMin, toKg } from '../../utils/quantity.js';
 
 const NEW_SUPPLIER = '__new_supplier__';
 const NEW_PRODUCT = '__new_product__';
@@ -17,6 +18,7 @@ const NEW_PRODUCT = '__new_product__';
 const emptyItem = () => ({
   productId: '',
   quantity: 1,
+  qtyUnit: 'kg',
   unitCost: 0,
   newProduct: { internalCode: '', barcode: '', name: '', price: '', vatRate: '21', otherTaxes: '', unitType: 'unit' },
 });
@@ -69,7 +71,7 @@ const Purchases = () => {
   }, []);
 
   const total = (watchedItems || []).reduce(
-    (sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unitCost) || 0),
+    (sum, item) => sum + Math.round(toKg(item.quantity, item.qtyUnit) * (Number(item.unitCost) || 0) * 100) / 100,
     0
   );
 
@@ -174,7 +176,7 @@ const Purchases = () => {
 
         payloadItems.push({
           productId,
-          quantity: Number(item.quantity),
+          quantity: toKg(item.quantity, item.qtyUnit),
           unitCost: Number(item.unitCost),
         });
       }
@@ -205,7 +207,7 @@ const Purchases = () => {
   const productOptions = products.filter((p) => !p.isCombo).map((p) => ({
     value: p.id,
     label: p.name,
-    detail: [p.internalCode && `Cód. ${p.internalCode}`, `Stock: ${p.stock}`].filter(Boolean).join(' · '),
+    detail: [p.internalCode && `Cód. ${p.internalCode}`, `Stock: ${formatQuantity(p.stock, p.unitType)}`].filter(Boolean).join(' · '),
     keywords: [p.internalCode, p.barcode, p.brand, p.model],
   }));
 
@@ -271,7 +273,11 @@ const Purchases = () => {
           {fields.map((field, index) => {
             const rowProductId = watchedItems?.[index]?.productId;
             const isNewProduct = rowProductId === NEW_PRODUCT;
-            const rowQuantity = Number(watchedItems?.[index]?.quantity) || 0;
+            const rowProduct = products.find((p) => p.id === rowProductId);
+            const rowUnitType = isNewProduct ? watchedItems?.[index]?.newProduct?.unitType : rowProduct?.unitType;
+            const rowQtyUnit = rowUnitType === 'weight' ? (watchedItems?.[index]?.qtyUnit || 'kg') : 'kg';
+            const rowQuantity = toKg(watchedItems?.[index]?.quantity, rowQtyUnit);
+            const rowCost = Number(watchedItems?.[index]?.unitCost) || 0;
 
             return (
               <div key={field.id} className="purchase-item-row">
@@ -299,15 +305,29 @@ const Purchases = () => {
                 </div>
                 <div className="field">
                   <label htmlFor={`item-quantity-${index}`}>Cantidad</label>
-                  <input
-                    id={`item-quantity-${index}`}
-                    type="number"
-                    placeholder="Ej: 10"
-                    {...register(`items.${index}.quantity`, { required: true, min: 1 })}
-                  />
+                  <div className={rowUnitType === 'weight' ? 'input-with-action' : undefined}>
+                    <input
+                      id={`item-quantity-${index}`}
+                      type="number"
+                      step={rowQtyUnit === 'g' ? '1' : quantityStep(rowUnitType)}
+                      placeholder={rowUnitType === 'weight' ? (rowQtyUnit === 'g' ? 'Ej: 500' : 'Ej: 10,500') : 'Ej: 10'}
+                      {...register(`items.${index}.quantity`, {
+                        required: true,
+                        min: rowQtyUnit === 'g' ? 1 : quantityMin(rowUnitType),
+                      })}
+                    />
+                    {rowUnitType === 'weight' && (
+                      <select aria-label="Unidad de la cantidad" {...register(`items.${index}.qtyUnit`)}>
+                        <option value="kg">kg</option>
+                        <option value="g">g</option>
+                      </select>
+                    )}
+                  </div>
                 </div>
                 <div className="field">
-                  <label htmlFor={`item-unitCost-${index}`}>Costo unitario</label>
+                  <label htmlFor={`item-unitCost-${index}`}>
+                    {rowUnitType === 'weight' ? 'Costo por kg' : 'Costo unitario'}
+                  </label>
                   <input
                     id={`item-unitCost-${index}`}
                     type="number"
@@ -327,6 +347,14 @@ const Purchases = () => {
                     Quitar
                   </button>
                 </div>
+
+                {rowUnitType === 'weight' && rowQuantity > 0 && (
+                  <div className="field field-full">
+                    <small className="report-note">
+                      {formatQuantity(rowQuantity, 'weight')} × ${rowCost.toFixed(2)} por kg = ${(Math.round(rowQuantity * rowCost * 100) / 100).toFixed(2)}
+                    </small>
+                  </div>
+                )}
 
                 {isNewProduct && (
                   <div className="inline-customer-form field-full">
@@ -354,7 +382,7 @@ const Purchases = () => {
                       />
                     </div>
                     <div className="field">
-                      <label htmlFor={`new-product-price-${index}`}>Precio de venta</label>
+                      <label htmlFor={`new-product-price-${index}`}>{rowUnitType === 'weight' ? 'Precio de venta por kg' : 'Precio de venta'}</label>
                       <input
                         id={`new-product-price-${index}`}
                         type="number"
@@ -392,7 +420,7 @@ const Purchases = () => {
                     <div className="field field-full stock-warning">
                       <span>
                         El costo del producto será el "Costo unitario" de esta fila. Se crea con stock 0 y la
-                        compra le suma las {rowQuantity} unidades.
+                        compra le suma {formatQuantity(rowQuantity, rowUnitType)}.
                       </span>
                     </div>
                   </div>
@@ -428,7 +456,7 @@ const Purchases = () => {
                 <td data-label="Fecha">{new Date(purchase.date).toLocaleDateString('es-AR')}</td>
                 <td data-label="Proveedor">{purchase.Supplier?.name || supplierName(purchase.supplierId)}</td>
                 <td data-label="Factura">{purchase.invoiceNumber || '—'}</td>
-                <td data-label="Artículos">{purchase.items?.map((i) => `${i.Product?.name} x${i.quantity}`).join(', ')}</td>
+                <td data-label="Artículos">{purchase.items?.map((i) => `${i.Product?.name} x${formatQuantity(i.quantity, i.Product?.unitType)}`).join(', ')}</td>
                 <td data-label="Total">${Number(purchase.total).toFixed(2)}</td>
               </tr>
             ))}

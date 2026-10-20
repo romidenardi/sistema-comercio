@@ -1,11 +1,17 @@
 import { Purchase, PurchaseItem, Product, Supplier, StockMovement, sequelize } from '../models/index.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { httpError } from '../utils/httpError.js';
-import { isPositiveInt, isNonNegative, toNumber, round2 } from '../utils/numbers.js';
+import {
+  isPositiveQuantity, isNonNegative, toNumber, round2, round3, quantityAllowedFor,
+} from '../utils/numbers.js';
 
 const purchaseIncludes = [
   { model: Supplier, attributes: ['id', 'name'] },
-  { model: PurchaseItem, as: 'items', include: [{ model: Product, attributes: ['id', 'name', 'internalCode'] }] },
+  {
+    model: PurchaseItem,
+    as: 'items',
+    include: [{ model: Product, attributes: ['id', 'name', 'internalCode', 'unitType'] }],
+  },
 ];
 
 export const getPurchases = asyncHandler(async (req, res) => {
@@ -28,11 +34,13 @@ export const createPurchase = asyncHandler(async (req, res) => {
   const rows = items.map((item, index) => {
     const n = index + 1;
     if (!item || !item.productId) throw httpError(`Artículo ${n}: falta el producto`);
-    if (!isPositiveInt(item.quantity)) throw httpError(`Artículo ${n}: la cantidad debe ser un entero mayor a 0`);
+    if (!isPositiveQuantity(item.quantity)) {
+      throw httpError(`Artículo ${n}: la cantidad debe ser un número mayor a 0, con hasta 3 decimales`);
+    }
     if (!isNonNegative(item.unitCost)) throw httpError(`Artículo ${n}: el costo no es válido`);
     return {
       productId: item.productId,
-      quantity: toNumber(item.quantity),
+      quantity: round3(toNumber(item.quantity)),
       unitCost: toNumber(item.unitCost),
     };
   });
@@ -51,7 +59,7 @@ export const createPurchase = asyncHandler(async (req, res) => {
 
     const byProduct = new Map();
     let total = 0;
-    for (const row of rows) {
+    for (const [index, row] of rows.entries()) {
       let entry = byProduct.get(row.productId);
       if (!entry) {
         const product = await Product.findOne({
@@ -63,7 +71,10 @@ export const createPurchase = asyncHandler(async (req, res) => {
         entry = { product, quantity: 0, lastCost: row.unitCost };
         byProduct.set(row.productId, entry);
       }
-      entry.quantity += row.quantity;
+      if (!quantityAllowedFor(entry.product, row.quantity)) {
+        throw httpError(`Artículo ${index + 1}: ${entry.product.name} se maneja por unidad, la cantidad debe ser un entero`);
+      }
+      entry.quantity = round3(entry.quantity + row.quantity);
       entry.lastCost = row.unitCost;
       total += row.quantity * row.unitCost;
     }
@@ -95,7 +106,7 @@ export const createPurchase = asyncHandler(async (req, res) => {
         reason: `Compra a proveedor ${supplier.name}`,
       }, { transaction: t });
 
-      product.stock += quantity;
+      product.stock = round3(product.stock + quantity);
       product.cost = lastCost;
       await product.save({ transaction: t });
     }

@@ -1,6 +1,7 @@
 import pkg from 'sequelize';
 const { DataTypes } = pkg;
 import sequelize from '../config/database.js';
+import { numericGetter } from '../utils/decimalColumn.js';
 
 const Product = sequelize.define('Product', {
   id: {
@@ -26,6 +27,11 @@ const Product = sequelize.define('Product', {
   barcode: {
     type: DataTypes.STRING,
     allowNull: true,
+  },
+  scalePlu: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    field: 'scale_plu',
   },
   name: {
     type: DataTypes.STRING,
@@ -79,9 +85,10 @@ const Product = sequelize.define('Product', {
     field: 'other_taxes',
   },
   stock: {
-    type: DataTypes.INTEGER,
+    type: DataTypes.DECIMAL(12, 3),
     allowNull: false,
     defaultValue: 0,
+    get: numericGetter('stock'),
   },
   active: {
     type: DataTypes.BOOLEAN,
@@ -99,12 +106,12 @@ const Product = sequelize.define('Product', {
     allowNull: true,
     field: 'special_price',
   },
-  
 }, {
   tableName: 'products',
   indexes: [
     { unique: true, fields: ['business_id', 'barcode'], name: 'uq_products_business_barcode' },
+    { unique: true, fields: ['business_id', 'scale_plu'], name: 'uq_products_business_scale_plu' },
   ],
 });
 
-export default Product; 
+export default Product;

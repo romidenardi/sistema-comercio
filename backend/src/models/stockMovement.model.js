@@ -1,6 +1,7 @@
 import pkg from 'sequelize';
 const { DataTypes } = pkg;
 import sequelize from '../config/database.js';
+import { numericGetter } from '../utils/decimalColumn.js';
 
 const StockMovement = sequelize.define('StockMovement', {
   id: {
@@ -8,7 +9,7 @@ const StockMovement = sequelize.define('StockMovement', {
     defaultValue: DataTypes.UUIDV4,
     primaryKey: true,
   },
-    businessId: {
+  businessId: {
     type: DataTypes.UUID,
     allowNull: false,
     field: 'business_id',
@@ -23,8 +24,9 @@ const StockMovement = sequelize.define('StockMovement', {
     allowNull: false,
   },
   quantity: {
-    type: DataTypes.INTEGER,
+    type: DataTypes.DECIMAL(12, 3),
     allowNull: false,
+    get: numericGetter('quantity'),
   },
   reason: {
     type: DataTypes.STRING,
