@@ -2,7 +2,7 @@
 
 API de gestión para pequeños comercios (stock, clientes, proveedores, compras, remitos, formas de pago, cuotas, descuentos e IVA). Multi-comercio: una sola base de datos, con los datos de cada comercio separados por `businessId`.
 
-**Stack:** Node.js, Express 5, Sequelize, MySQL, JWT, Nodemailer. Desplegado en Railway.
+**Stack:** Node.js, Express 5, Sequelize, MySQL, JWT, Nodemailer, node-cron, xlsx (SheetJS). Desplegado en Railway.
 
 ## Entornos
 
@@ -31,7 +31,7 @@ npm run dev            # nodemon server.js
 | `npm run dev` | Arranca con recarga automática (nodemon) |
 | `npm start` | Arranca para producción (`node server.js`) |
 
-Al iniciar, el servidor valida las variables obligatorias, verifica que `JWT_SECRET` y `PLATFORM_JWT_SECRET` sean distintas, se conecta a MySQL y ejecuta `sequelize.sync()` (ver "Cambios en la base de datos").
+Al iniciar, el servidor valida las variables obligatorias, verifica que `JWT_SECRET` y `PLATFORM_JWT_SECRET` sean distintas, se conecta a MySQL, ejecuta `sequelize.sync()` (ver "Cambios en la base de datos") y, una vez escuchando, arranca la tarea programada de bajas (ver "Baja de comercios").
 
 ## Variables de entorno
 
@@ -45,6 +45,8 @@ Al iniciar, el servidor valida las variables obligatorias, verifica que `JWT_SEC
 | `PORT` | No | Puerto del servidor (por defecto 3000; Railway lo define solo) |
 | `NODE_ENV` | No | `production` en Railway (oculta detalles de errores) |
 | `DEMO_RESET_ENABLED` | No | `false` desactiva el reinicio nocturno de la demo (en staging va en `false`) |
+| `SUPPORT_EMAIL` | Recomendada | Casilla de consultas que figura en los mails de baja. Valor actual: `hola@talarix.com.ar`. Cargarla en **ambos** entornos de Railway |
+| `DISABLE_AUTO_PURGE` | No | `true` desactiva el borrado automático de comercios dados de baja (ver "Baja de comercios") |
 | `MAIL_HOST`, `MAIL_PORT`, `MAIL_USER`, `MAIL_PASS`, `MAIL_FROM` | No | Envío de mails por SMTP (ver "Mails") |
 | `MAIL_SECURE` | No | `true` o `false`. Por defecto es `true` solo con el puerto 465 |
 
@@ -52,7 +54,7 @@ En Railway, los `DB_*` se cargan como referencias a la base del propio entorno, 
 
 ## Estructura
 ```
-server.js          arranque: valida variables, conecta, sync y listen
+server.js          arranque: valida variables, conecta, sync, listen y tarea de bajas
 src/
   app.js           Express: middlewares globales y montaje de rutas
   config/          conexión a la base (database.js)
@@ -60,10 +62,12 @@ src/
   routes/          definición de rutas
   models/          modelos Sequelize
   middlewares/     auth, roles, demo, errores
-  services/        servicios (p. ej. datos de la cuenta demo)
+  services/        servicios: datos de la cuenta demo, exportación a Excel,
+                   borrado de un comercio y programador de bajas
   jobs/            tareas programadas (reinicio nocturno de la demo)
   utils/           ayudas: asyncHandler, httpError, números, tokens de
-                   invitación, versión de términos, mails y links de acceso
+                   invitación, versión de términos, mails y links de acceso,
+                   mails de baja
 scripts/           scripts de operación (crear superadmin)
 ```
 
@@ -76,13 +80,18 @@ Todas las rutas cuelgan de `/api`. Salvo `auth` y `platform`, exigen token de us
 | `/auth/login`, `/auth/activate` | pública | Ingreso y activación de cuenta con aceptación de términos |
 | `/auth/forgot-password`, `/auth/reset-password` | pública | Recuperar contraseña por mail |
 | `/platform/*` | superadmin | Alta de comercios, estado, reinvitar, reiniciar demo |
+| `/platform/businesses/:id/closure` | superadmin | `POST` inicia la baja (pide el nombre exacto del comercio en `confirmName`); `DELETE` la cancela |
 | `/categories`, `/products`, `/stock-movements` | autenticados | Catálogo y movimientos de stock |
+| `/combos` | autenticados | Combos de productos |
 | `/payments`, `/customers`, `/suppliers` | autenticados | Formas de pago (cuotas y descuentos), clientes, proveedores |
 | `/purchases`, `/orders` | autenticados | Compras y remitos |
 | `/orders/:id/cancel` | `admin`, `editor` | Anula un remito y devuelve el stock |
 | `/reports/*` | `admin`, `editor` | Panel de inicio y reportes (ventas, productos, clientes, formas de pago, IVA) |
 | `/imports` | `admin`, `editor` | Importación desde Excel (bloqueada en demo) |
 | `/users` | `admin` | Usuarios del comercio (bloqueada en demo) |
+| `/export` | `admin` | Descarga de todos los datos del comercio en un Excel. **Única ruta disponible durante la baja** |
+| `/data-rights/customers/:id/export` | `admin` | Exporta los datos de un cliente (pedido de acceso) |
+| `/data-rights/customers/:id/anonymize` | `admin` | Anonimiza a un cliente (pedido de supresión), conservando sus remitos |
 
 Detalles que conviene saber:
 - Los precios incluyen IVA. `Order.total` es el final, después de descuentos; las cuotas son informativas.
@@ -92,18 +101,19 @@ Detalles que conviene saber:
 
 ## Seguridad y multi-comercio
 - Todo recurso se filtra por `req.user.businessId`. El middleware de autenticación revalida en cada request que el usuario esté activo y con contraseña, y que el comercio esté activo.
-- Roles: `admin` (todo, incluye usuarios), `editor` (todo, sin usuarios) y `operador` (solo compras y remitos).
+- Roles: `admin` (todo, incluye usuarios, exportación y derechos de datos), `editor` (todo, sin usuarios) y `operador` (solo compras y remitos).
 - El **superadmin** usa un login y un token aparte (`/api/platform/*`). Ve metadatos de cuentas, nunca contenido de los comercios ni contraseñas.
 - Los usuarios se crean de dos maneras: el administrador del comercio les asigna una contraseña, o les manda una **invitación** por mail para que elijan la suya.
 - Los links de invitación (vencen a los 7 días) y de restablecer contraseña (vencen a la hora) son de un solo uso. En la base solo se guarda el hash del token.
 - La activación exige aceptar los términos y registra versión, fecha e IP de la aceptación.
-- "Olvidé mi contraseña" responde siempre lo mismo, exista o no el email; no reenvía más de un mail por minuto y no envía nada a usuarios inactivos, comercios suspendidos ni cuentas demo.
+- "Olvidé mi contraseña" responde siempre lo mismo, exista o no el email; no reenvía más de un mail por minuto y no envía nada a usuarios inactivos, comercios suspendidos ni cuentas demo. Los administradores de un comercio en baja sí pueden recuperarla, para poder exportar sus datos.
 - Protecciones: `helmet`, límite de intentos en login, activación, recuperar y restablecer contraseña, lista de orígenes CORS, validaciones numéricas y de pertenencia entre comercios.
-- Cuenta **demo** (`Business.type = 'demo'`): datos de ejemplo, se reinicia todas las noches a las 03:00 (hora de Buenos Aires), con gestión de usuarios e importación bloqueadas.
+- La exportación tiene límite de 5 pedidos por hora por usuario.
+- Cuenta **demo** (`Business.type = 'demo'`): datos de ejemplo, se reinicia todas las noches a las 03:00 (hora de Buenos Aires), con gestión de usuarios e importación bloqueadas. Nunca se da de baja ni se purga.
 
 ## Mails
 
-Los mails salen por SMTP con Nodemailer. Hay tres: invitación, aviso de usuario creado (nunca incluye la contraseña) y restablecer contraseña.
+Los mails salen por SMTP con Nodemailer. Hay: invitación, aviso de usuario creado (nunca incluye la contraseña), restablecer contraseña y avisos de baja del comercio (plantillas en `src/utils/closureEmails.js`).
 
 ```
 MAIL_HOST=mail.talarix.com.ar
@@ -111,13 +121,36 @@ MAIL_PORT=587
 MAIL_USER=no-reply@talarix.com.ar
 MAIL_PASS=<contraseña de la casilla>
 MAIL_FROM=Talarix <no-reply@talarix.com.ar>
+SUPPORT_EMAIL=hola@talarix.com.ar
 ```
 
 - `MAIL_FROM` debe usar la misma casilla que `MAIL_USER`.
 - Si las variables `MAIL_*` faltan o el envío falla, el sistema **no se rompe**: avisa que el mail no salió y muestra el link para copiarlo y pasarlo por otro medio.
 - Para cambiar de proveedor (Resend, Brevo, etc.) alcanza con cambiar las variables.
 - Si el mail cae en spam, revisar SPF y DKIM del dominio (en cPanel: *Email Deliverability*).
-- Plantillas: `src/utils/mailTemplates.js`.
+- Plantillas: `src/utils/mailTemplates.js` y `src/utils/closureEmails.js`.
+
+## Baja de comercios
+
+La baja la ejecuta el superadmin desde `/plataforma` ("Dar de baja"). Solo aplica a comercios de tipo `client`.
+
+1. **Inicio.** `POST /api/platform/businesses/:id/closure` exige escribir el nombre exacto del comercio. Pasa `Business.status` a `closing`, guarda `delete_at` (hoy + 30 días) y avisa por mail a los administradores.
+2. **Período de 30 días.** Solo el administrador puede ingresar, y únicamente para exportar sus datos. El resto de los usuarios no entra. Cualquier otra ruta responde `403` con `{ code: 'ACCOUNT_CLOSING' }`. Mientras dura la baja no se puede suspender ni reactivar el comercio.
+3. **Cancelación.** `DELETE /api/platform/businesses/:id/closure` lo devuelve a `active`; no se borra nada.
+4. **Borrado.** Una tarea (`node-cron`, todos los días a las 03:30, hora de Buenos Aires, y una vez 30 segundos después de cada arranque del servidor) elimina los comercios con `status = 'closing'`, `type = 'client'` y `delete_at` vencido. Borra todos sus datos (productos, clientes, remitos, usuarios, etc.) en **una sola transacción**: o se borra todo, o nada.
+5. **Constancia.** Queda un registro mínimo en `closure_records` (id y nombre del comercio, fecha programada, fecha de borrado y cantidad de usuarios), sin datos de sus clientes.
+
+Para frenar el borrado automático (por ejemplo, ante una duda o durante una restauración) cargar `DISABLE_AUTO_PURGE=true` y reiniciar la API. Los comercios siguen en `closing`, pero no se borran.
+
+Cuando se prueba en staging, reiniciar el servicio de la **API** (no el de MySQL) para que corra la purga de arranque.
+
+## Derechos sobre los datos
+Atención de pedidos de acceso, rectificación y supresión de clientes finales de un comercio (Ley 25.326):
+- **Acceso:** `GET /api/data-rights/customers/:id/export` descarga los datos de ese cliente.
+- **Rectificación:** se hace editando el cliente desde la pantalla de Clientes.
+- **Supresión:** `POST /api/data-rights/customers/:id/anonymize` anonimiza al cliente y **conserva sus remitos**, que son registro comercial del comercio.
+
+Solo puede hacerlo el `admin` del comercio. Los plazos de respuesta y qué se puede anonimizar cuando haya facturas emitidas están pendientes de validación con abogado y contador.
 
 ## Superadmin
 Crear el primer superadmin (apuntando a la base del entorno correspondiente):
@@ -131,7 +164,7 @@ Para correrlo contra Railway hay que habilitar temporalmente el TCP Proxy del My
 ## Cambios en la base de datos
 
 `sequelize.sync()` corre en cada arranque. Hace dos cosas:
-- **Crea las tablas nuevas** que falten.
+- **Crea las tablas nuevas** que falten (por ejemplo, `closure_records`).
 - **Agrega los índices declarados en los modelos**, aun en tablas existentes. Si los datos no cumplen el índice (por ejemplo, duplicados en un índice único), **el servidor no arranca y Railway lo reinicia en bucle**.
 
 No modifica columnas existentes: esos cambios se hacen con `ALTER TABLE` manual.
@@ -140,7 +173,7 @@ Regla de oro: **todo cambio de base se corre en producción antes de hacer el me
 
 1. Probar en la base de staging, una sentencia por vez (Railway → MySQL → Data → Query).
 2. Si el cambio incluye un índice único, limpiar primero los datos que lo violarían.
-3. Correrlo en la base de producción.
+3. Correrlo en la base de producción (con un backup manual hecho antes).
 4. Recién entonces, hacer el merge a `main`.
 
 ### Historial de cambios manuales
@@ -162,6 +195,13 @@ ALTER TABLE products ADD UNIQUE INDEX uq_products_business_barcode (business_id,
 ```
 La segunda consulta tiene que devolver 0 filas antes de crear el índice. El índice también está declarado en `product.model.js`.
 
+**Baja de comercios** (`businesses`, octubre 2026):
+```sql
+ALTER TABLE businesses MODIFY COLUMN status ENUM('active','suspended','closing') NOT NULL DEFAULT 'active'
+ALTER TABLE businesses ADD COLUMN delete_at DATETIME NULL
+```
+La tabla `closure_records` la crea `sync` sola.
+
 ## Flujo de trabajo
 
 El repositorio es único y contiene `backend/` y `frontend/`. **Hacer `git add` y `commit` desde la raíz del repo**: si se hace desde una sola de las carpetas, los cambios de la otra no se incluyen.
@@ -177,10 +217,20 @@ git merge staging
 git push
 git checkout staging
 ```
-5. Si se agrega una dependencia nueva, hacer `npm install <paquete>` en la carpeta correspondiente y subir `package.json` y `package-lock.json` juntos. Si falta, el deploy falla con `Cannot find package`.
+5. Si se agrega una dependencia nueva, hacer `npm install <paquete>` en la carpeta correspondiente y subir `package.json` y `package-lock.json` juntos. Si falta, el deploy falla con `Cannot find package`. Dependencias recientes: `node-cron` y `xlsx` (0.18.5).
 
 ## Backups
-Railway Pro: backups diarios (se guardan 6 días), semanales (27 días) y mensuales (89 días) del MySQL de producción. Restaurar: servicio MySQL → Backups → elegir fecha → Restore → revisar → Deploy (crea un volumen nuevo).
+Railway Pro: backups diarios (se guardan 6 días), semanales (27 días) y mensuales (89 días) del MySQL de producción. Los términos y la política de privacidad hablan de un plazo aproximado de 90 días.
+
+Restaurar: servicio MySQL → Backups → elegir fecha → Restore → revisar → Deploy. Detalles:
+- La restauración crea un **volumen nuevo** (tarda menos de 20 segundos en la base actual) y solo funciona dentro del mismo proyecto y entorno.
+- Es **todo o nada**: no hay restauración por comercio. Recuperar los datos de un solo comercio implica restaurar a un volumen nuevo y copiar lo necesario a mano.
+- Se probó en staging (octubre 2026): los datos y el backend volvieron correctamente.
+- Antes de un cambio de base en producción, crear un backup manual.
+- Si se restaura un backup anterior a una baja, revisar los comercios en `closing` y considerar `DISABLE_AUTO_PURGE=true` hasta verificar.
 
 ## Textos legales
-La versión vigente de los términos y del aviso de privacidad está en `src/utils/legal.js` y debe coincidir con `LEGAL_VERSION` del frontend.
+La versión vigente de los términos y del aviso de privacidad está en `src/utils/legal.js` y debe coincidir con `LEGAL_VERSION` del frontend. Hoy es un borrador (`2026-10-borrador-1`) pendiente de revisión legal. La casilla de contacto es `hola@talarix.com.ar`.
+
+---
+Última actualización: 20/10/2026.

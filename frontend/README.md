@@ -35,28 +35,30 @@ En Vercel hay una variable por entorno: una para **Production** y otra para **Pr
 | `/plataforma/login`, `/plataforma` | superadmin (token aparte, guardado en `sessionStorage`) |
 | `/`, `/orders`, `/purchases` | usuarios autenticados |
 | `/orders/:id/print` | usuarios autenticados (remito para imprimir) |
+| `/exportar` | usuarios autenticados; la pantalla solo deja exportar al `admin`. Es la única disponible cuando el comercio está en baja |
 | `/reports`, `/categories`, `/payments`, `/customers`, `/products`, `/suppliers`, `/imports` | `admin` y `editor` |
 | `/users` | `admin` |
 
-Las rutas están en `src/routes/AppRoutes.jsx`.
+Las rutas están en `src/routes/AppRoutes.jsx`. Al agregar una pantalla, **partir siempre del archivo actual del repo**: si se reconstruye desde una copia vieja se pierden rutas (pasó con `/olvide-contrasena` y `/restablecer`).
 
 ## Estructura
 ```
 src/
   api/          cliente HTTP (axios.js) y llamadas por recurso
-  context/      AuthContext (sesión, rol, modo demo)
+  context/      AuthContext (sesión, rol, modo demo, comercio en baja)
   hooks/        hooks compartidos (p. ej. useResource)
   components/   layout (menú y barra lateral) y componentes compartidos
-  pages/        una carpeta por pantalla
+  pages/        una carpeta por pantalla (Export/ tiene la exportación de datos)
   legal/        textos de términos y privacidad (legalContent.js)
   routes/       definición de rutas y rutas privadas
-  utils/        ayudas de formato
+  utils/        ayudas de formato y descarga de archivos (download.js)
   index.css     estilos globales y variables de color
 ```
 
 ## Sesión
-- Al ingresar se guardan `token` y `user` en `localStorage`.
+- Al ingresar se guardan `token` y `user` en `localStorage`, junto con `businessStatus` y la fecha de borrado si el comercio está en baja.
 - `src/api/axios.js` agrega el token a cada pedido y, ante un `401` (salvo en el login), borra la sesión y vuelve a `/login`.
+- Ante un `403` con `code: 'ACCOUNT_CLOSING'`, marca el comercio como `closing` en `localStorage` y redirige a `/exportar`.
 - El token del superadmin se guarda aparte, en `sessionStorage`.
 
 ## Funciones a tener en cuenta
@@ -64,15 +66,21 @@ src/
 - **Usuarios** (solo `admin`): se pueden crear con contraseña asignada, o enviando una **invitación por mail**. Cada usuario tiene un botón para reenviar la invitación o enviar un link de contraseña. Si el mail no sale, se muestra el link para copiarlo.
 - **Plataforma:** al crear un comercio o reinvitar, se envía el mail con el link y se muestra además para copiarlo y compartirlo por WhatsApp.
 - **Menú en el celular:** se muestra como menú hamburguesa (barra superior con botón, y panel lateral con fondo oscurecido).
+- **Exportar mis datos** (`/exportar`, solo `admin`): descarga un Excel con todos los datos del comercio. Está en el menú. Se promete en los términos como parte de la gratuidad y de la baja. Tiene un límite de 5 descargas por hora.
+- **Baja de comercios** (superadmin, en `/plataforma`):
+  - "Dar de baja" pide escribir el nombre exacto del comercio; el comercio queda "En baja" con la fecha de eliminación (30 días).
+  - "Cancelar baja" lo devuelve a activo.
+  - Durante la baja, el `admin` del comercio solo ve `/exportar` (el layout redirige) y el resto de los usuarios no puede ingresar.
+- **Derechos sobre los datos de clientes** (`admin`, en Clientes): botón "Exportar datos" (pedido de acceso) y "Anonimizar" (pedido de supresión; conserva los remitos del cliente).
 
 ## Estilos
-Todo el CSS está en `src/index.css`. Los colores y tamaños se definen como variables en `:root` (`--color-primary`, `--color-text`, `--color-border`, `--color-danger`, `--color-success`, `--color-warning`, etc.): **usar siempre las variables**, no colores sueltos.
+Casi todo el CSS está en `src/index.css`; algunas pantallas tienen su propio archivo (por ejemplo, `pages/Export/ExportData.css`). Los colores y tamaños se definen como variables en `:root` (`--color-primary`, `--color-text`, `--color-border`, `--color-danger`, `--color-success`, `--color-warning`, etc.): **usar siempre las variables**, no colores sueltos.
 
 ## Cuenta demo
-Si el comercio es de tipo demo, el menú oculta Importar y Usuarios y se muestra un aviso de que no deben cargarse datos reales.
+Si el comercio es de tipo demo, el menú oculta Importar y Usuarios y se muestra un aviso de que no deben cargarse datos reales. La demo no se puede dar de baja.
 
 ## Textos legales
-Se editan en `src/legal/legalContent.js`. Al cambiarlos:
+Se editan en `src/legal/legalContent.js`. Hoy están en borrador (`LEGAL_VERSION = '2026-10-borrador-1'`, `LEGAL_IS_DRAFT = true`) hasta que los valide el abogado. La casilla de contacto es `hola@talarix.com.ar`. Al cambiarlos:
 1. Subir `LEGAL_VERSION`.
 2. Subir también la misma versión en `backend/src/utils/legal.js`. Si no coinciden, la activación de cuentas falla a propósito.
 3. Poner `LEGAL_IS_DRAFT = false` cuando estén validados.
@@ -82,5 +90,9 @@ Se editan en `src/legal/legalContent.js`. Al cambiarlos:
 - Rama `main` → producción.
 - `vercel.json` redirige todas las rutas a `index.html` (SPA).
 - Si se agrega una dependencia, subir `package.json` y `package-lock.json` juntos.
+- Orden recomendado cuando hay cambios en ambos lados: primero el backend, después el frontend.
 
 Flujo de trabajo, cambios en la base y variables del servidor: ver el README del backend. Recordá hacer `git add` y `commit` desde la **raíz del repo**.
+
+---
+Última actualización: 20/10/2026.

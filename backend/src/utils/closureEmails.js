@@ -15,9 +15,8 @@ const formatDate = (value) =>
     year: 'numeric',
   });
 
-const supportEmail = () => process.env.SUPPORT_EMAIL || 'rominadenardi@gmail.com';
+const supportEmail = () => process.env.SUPPORT_EMAIL || 'hola@talarix.com.ar';
 
-// Aviso al administrador cuando se registra la baja de su comercio
 export const closureStartedEmail = ({ name, businessName, deleteAt }) => {
   const date = formatDate(deleteAt);
   const appUrl = (process.env.APP_URL || '').replace(/\/$/, '');
