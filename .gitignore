@@ -1,0 +1,18 @@
+# Dependencias
+node_modules/
+
+# Variables de entorno (se sube solo el .env.example)
+.env
+.env.*
+!.env.example
+
+# Builds
+dist/
+
+# Sistema y editor
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
+
+# Logs
+*.log
