@@ -26,6 +26,13 @@ cp .env.example .env   # si no existe, crear .env con las variables de abajo
 npm run dev            # nodemon server.js
 ```
 
+**Base local desde cero** (lo más simple si la base local quedó atrasada respecto de staging y producción):
+1. En el cliente de MySQL: `DROP DATABASE <DB_NAME>;` y `CREATE DATABASE <DB_NAME>;`.
+2. `npm run dev`: `sync` crea todas las tablas con sus columnas actuales.
+3. Crear el superadmin con `scripts/createPlatformAdmin.js` (ver "Superadmin") y un comercio desde `/plataforma`.
+
+Una base local vieja falla al arrancar si le faltan los cambios manuales del historial (por ejemplo, duplicados en el índice único de códigos de barras).
+
 | Script | Qué hace |
 |---|---|
 | `npm run dev` | Arranca con recarga automática (nodemon) |
@@ -37,7 +44,7 @@ Al iniciar, el servidor valida las variables obligatorias, verifica que `JWT_SEC
 
 | Variable | Obligatoria | Descripción |
 |---|---|---|
-| `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` | Sí | Conexión a MySQL |
+| `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` | Sí | Conexión a MySQL. En producción la app usa el usuario `talarix_app`, no `root` (ver "Credenciales y rotación de claves") |
 | `JWT_SECRET` | Sí | Firma de los tokens de usuarios (8 h) |
 | `PLATFORM_JWT_SECRET` | Sí | Firma de los tokens del superadmin (2 h). Debe ser **distinta** de `JWT_SECRET` |
 | `APP_URL` | Sí | URL pública del frontend, sin barra final. Se usa en los links de los mails (activación, restablecer contraseña) |
@@ -117,7 +124,7 @@ Detalles que conviene saber:
 - "Olvidé mi contraseña" responde siempre lo mismo, exista o no el email; no reenvía más de un mail por minuto y no envía nada a usuarios inactivos, comercios suspendidos ni cuentas demo. Los administradores de un comercio en baja sí pueden recuperarla, para poder exportar sus datos.
 - Protecciones: `helmet`, límite de intentos en login, activación, recuperar y restablecer contraseña, lista de orígenes CORS, validaciones numéricas y de pertenencia entre comercios.
 - La exportación tiene límite de 5 pedidos por hora por usuario.
-- Cuenta **demo** (`Business.type = 'demo'`): datos de ejemplo, se reinicia todas las noches a las 03:00 (hora de Buenos Aires), con gestión de usuarios e importación bloqueadas. Nunca se da de baja ni se purga.
+- Cuenta **demo** (`Business.type = 'demo'`): datos de ejemplo, con gestión de usuarios e importación bloqueadas. Nunca se da de baja ni se purga. El reinicio nocturno (03:00, hora de Buenos Aires) está programado en `jobs/demoReset.job.js`, pero **hoy no corre**: `startDemoResetJob` no se llama en `server.js` (pendiente B10 de la revisión de código).
 
 ## Mails
 
@@ -167,7 +174,9 @@ DB_HOST=... DB_PORT=... DB_NAME=... DB_USER=... DB_PASSWORD='...' \
 PLATFORM_ADMIN_EMAIL=mail@dominio.com PLATFORM_ADMIN_PASSWORD='...' PLATFORM_ADMIN_NAME='Nombre' \
 node scripts/createPlatformAdmin.js
 ```
-Para correrlo contra Railway hay que habilitar temporalmente el TCP Proxy del MySQL y **desactivarlo al terminar**.
+La contraseña del superadmin tiene que tener **al menos 12 caracteres**. Las variables escritas en la línea de comando tienen prioridad sobre las del `.env`.
+
+Para correrlo contra Railway hay que habilitar temporalmente el TCP Proxy del MySQL (Settings → Networking) y **desactivarlo al terminar**. En ese caso, `DB_HOST` y `DB_PORT` son los del proxy (`xxx.proxy.rlwy.net` y su puerto), y `DB_NAME`, `DB_USER` y `DB_PASSWORD` salen de las variables del servicio MySQL.
 
 ## Cambios en la base de datos
 
@@ -224,7 +233,7 @@ El último solo hace falta si `sync` no crea el índice (está declarado en `pro
 
 ## Flujo de trabajo
 
-El repositorio es único y contiene `backend/` y `frontend/`. **Hacer `git add` y `commit` desde la raíz del repo**: si se hace desde una sola de las carpetas, los cambios de la otra no se incluyen.
+El repositorio es único (`romidenardi/talarix`, público) y contiene `backend/` y `frontend/`. **Hacer `git add` y `commit` desde la raíz del repo**: si se hace desde una sola de las carpetas, los cambios de la otra no se incluyen.
 
 1. Trabajar en la rama `staging` y hacer push: Railway y Vercel despliegan solos en staging.
 2. Probar en la URL de staging.
@@ -237,7 +246,8 @@ git merge staging
 git push
 git checkout staging
 ```
-5. Si se agrega una dependencia nueva, hacer `npm install <paquete>` en la carpeta correspondiente y subir `package.json` y `package-lock.json` juntos. Si falta, el deploy falla con `Cannot find package`. Dependencias recientes: `node-cron` y `xlsx` (0.18.5).
+5. Si Railway no puede bajar un commit ("failed to fetch snapshot"), no usar **Redeploy**: vuelve a desplegar el mismo commit, que puede no existir más (por ejemplo, después de limpiar el historial). Usar **Deploy Latest Commit** o hacer un commit vacío (`git commit --allow-empty`) y push.
+6. Si se agrega una dependencia nueva, hacer `npm install <paquete>` en la carpeta correspondiente y subir `package.json` y `package-lock.json` juntos. Si falta, el deploy falla con `Cannot find package`. Dependencias recientes: `node-cron` y `xlsx` (0.18.5).
 
 ## Backups
 Railway Pro: backups diarios (se guardan 6 días), semanales (27 días) y mensuales (89 días) del MySQL de producción. Los términos y la política de privacidad hablan de un plazo aproximado de 90 días.
@@ -248,9 +258,36 @@ Restaurar: servicio MySQL → Backups → elegir fecha → Restore → revisar �
 - Se probó en staging (octubre 2026): los datos y el backend volvieron correctamente.
 - Antes de un cambio de base en producción, crear un backup manual.
 - Si se restaura un backup anterior a una baja, revisar los comercios en `closing` y considerar `DISABLE_AUTO_PURGE=true` hasta verificar.
+- Un backup restaura la base **completa, incluidos los usuarios de MySQL y sus contraseñas**. Si se restaura uno anterior al 22/10/2026, el usuario `talarix_app` no existe y `root` vuelve a la contraseña expuesta: hay que crear `talarix_app` de nuevo y cambiar la clave de `root` (ver "Credenciales y rotación de claves").
+
+## Credenciales y rotación de claves
+
+**Reglas**
+- El `.env` nunca va al repo. Lo excluye el `.gitignore` de la raíz; `node_modules` también. Guardar una copia del `.env` local fuera del repo.
+- Cada entorno tiene sus propias claves: nunca repetir las de producción en staging ni en local.
+- Generar claves con `node -e "console.log(require('crypto').randomBytes(24).toString('hex'))"` (solo letras y números) y **anotarlas en un archivo antes de usarlas**: una clave de MySQL perdida a mitad de un cambio no se recupera.
+- La app de producción se conecta con el usuario `talarix_app` (`ALL PRIVILEGES` sobre la base `railway`), no con `root`. `root` queda para el panel de Railway (pestaña Data).
+- Cuentas de GitHub, Railway, Vercel y mail con segundo factor (2FA).
+
+**Historial (octubre 2026)**
+- El repo era público y `backend/.env` estuvo versionado. El 22/10/2026 se rotaron los secretos y se limpió el historial con `git filter-repo` (sin `.env` ni `node_modules`) y `push --force`. Los clones anteriores tienen el historial viejo: no se usan más.
+- El mismo día, Railway informó un acceso no autorizado a variables de entorno de sus clientes. Se rotaron todas las claves de staging y producción (JWT, mail y base). Staging pasó a una base nueva (servicio `MySQL-UOHe`); la anterior quedó sin uso, pendiente de borrar.
+
+**Cómo rotar**
+- `JWT_SECRET` / `PLATFORM_JWT_SECRET`: cambiar la variable y desplegar. Todas las sesiones se cortan y los usuarios vuelven a ingresar.
+- `MAIL_PASS`: cambiarla en el proveedor de mail y enseguida en Railway, en los dos entornos. Hasta desplegar, los mails fallan.
+- Base de datos, sin cortar el servicio:
+  1. Crear un usuario nuevo con clave nueva (en Data → Query):
+     ```sql
+     CREATE USER 'talarix_app2'@'%' IDENTIFIED BY '<clave>';
+     GRANT ALL PRIVILEGES ON railway.* TO 'talarix_app2'@'%';
+     ```
+  2. Cambiar `DB_USER` y `DB_PASSWORD` del backend, desplegar y comprobar el ingreso. Con `SELECT user FROM information_schema.processlist;` se ve qué usuario usa la app.
+  3. Borrar el usuario anterior (`DROP USER 'talarix_app'@'%';`).
+- Clave de `root`: `ALTER USER 'root'@'%' IDENTIFIED BY '<clave>';` y lo mismo para `'root'@'localhost'`, con la misma clave. Enseguida, poner esa clave en `MYSQL_ROOT_PASSWORD` (y en `MYSQLPASSWORD` si no es una referencia) y aplicar los cambios. MySQL se reinicia y la app se corta unos segundos.
 
 ## Textos legales
 La versión vigente de los términos y del aviso de privacidad está en `src/utils/legal.js` y debe coincidir con `LEGAL_VERSION` del frontend. Hoy es un borrador (`2026-10-borrador-1`) pendiente de revisión legal. La casilla de contacto es `hola@talarix.com.ar`.
 
 ---
-Última actualización: 20/10/2026 (productos por peso y balanza).
+Última actualización: 22/10/2026 (credenciales, rotación de claves y base local).
