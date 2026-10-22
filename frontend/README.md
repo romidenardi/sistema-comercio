@@ -20,6 +20,12 @@ npm run lint     # oxlint
 |---|---|
 | `VITE_API_URL` | URL base del backend, incluyendo `/api` (ej. `https://api.talarix.com.ar/api`) |
 
+**En local**, crear `frontend/.env.local` (el `.gitignore` del frontend lo excluye) con:
+```
+VITE_API_URL=http://localhost:3000/api
+```
+El puerto es el `PORT` del `backend/.env`. Sin ese archivo, el frontend local llama a la API de producción y el ingreso falla con un error de CORS. Después de crearlo o cambiarlo, reiniciar `npm run dev`.
+
 Las variables de Vite se incorporan **al construir**: si cambian en Vercel, hay que redesplegar.
 
 En Vercel hay una variable por entorno: una para **Production** y otra para **Preview** limitada a la rama `staging`.
@@ -101,4 +107,4 @@ Se editan en `src/legal/legalContent.js`. Hoy están en borrador (`LEGAL_VERSION
 Flujo de trabajo, cambios en la base y variables del servidor: ver el README del backend. Recordá hacer `git add` y `commit` desde la **raíz del repo**.
 
 ---
-Última actualización: 20/10/2026 (productos por peso y balanza).
+Última actualización: 22/10/2026 (`.env.local` para trabajar en local).
