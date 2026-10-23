@@ -16,6 +16,11 @@ import ComboItem from './comboItem.model.js';
 import PlatformAdmin from './platformAdmin.model.js';
 import ClosureRecord from './closureRecord.model.js';
 
+// Borrado de registros con historial: las claves de remitos y compras hacia clientes, proveedores,
+// productos y formas de pago son RESTRICT. La base rechaza borrar algo que ya se usó en un remito
+// o una compra, y los controladores avisan antes con un 409 (ver customer/supplier/product).
+// Los movimientos de stock siguen en CASCADE: un producto nunca vendido ni comprado se puede borrar.
+
 Business.hasMany(Category, { foreignKey: 'businessId' });
 Category.belongsTo(Business, { foreignKey: 'businessId' });
 
@@ -49,23 +54,23 @@ Supplier.belongsTo(Business, { foreignKey: 'businessId' });
 Business.hasMany(Purchase, { foreignKey: 'businessId' });
 Purchase.belongsTo(Business, { foreignKey: 'businessId' });
 
-Supplier.hasMany(Purchase, { foreignKey: 'supplierId' });
-Purchase.belongsTo(Supplier, { foreignKey: 'supplierId' });
+Supplier.hasMany(Purchase, { foreignKey: 'supplierId', onDelete: 'RESTRICT', onUpdate: 'CASCADE' });
+Purchase.belongsTo(Supplier, { foreignKey: 'supplierId', onDelete: 'RESTRICT', onUpdate: 'CASCADE' });
 
 Purchase.hasMany(PurchaseItem, { as: 'items', foreignKey: 'purchaseId' });
 PurchaseItem.belongsTo(Purchase, { foreignKey: 'purchaseId' });
 
-Product.hasMany(PurchaseItem, { foreignKey: 'productId' });
-PurchaseItem.belongsTo(Product, { foreignKey: 'productId' });
+Product.hasMany(PurchaseItem, { foreignKey: 'productId', onDelete: 'RESTRICT', onUpdate: 'CASCADE' });
+PurchaseItem.belongsTo(Product, { foreignKey: 'productId', onDelete: 'RESTRICT', onUpdate: 'CASCADE' });
 
 Business.hasMany(Order, { foreignKey: 'businessId' });
 Order.belongsTo(Business, { foreignKey: 'businessId' });
 
-Customer.hasMany(Order, { foreignKey: 'customerId' });
-Order.belongsTo(Customer, { foreignKey: 'customerId' });
+Customer.hasMany(Order, { foreignKey: 'customerId', onDelete: 'RESTRICT', onUpdate: 'CASCADE' });
+Order.belongsTo(Customer, { foreignKey: 'customerId', onDelete: 'RESTRICT', onUpdate: 'CASCADE' });
 
-Payment.hasMany(Order, { foreignKey: 'paymentId' });
-Order.belongsTo(Payment, { foreignKey: 'paymentId' });
+Payment.hasMany(Order, { foreignKey: 'paymentId', onDelete: 'RESTRICT', onUpdate: 'CASCADE' });
+Order.belongsTo(Payment, { foreignKey: 'paymentId', onDelete: 'RESTRICT', onUpdate: 'CASCADE' });
 
 InstallmentPlan.hasMany(Order, { foreignKey: 'installmentPlanId' });
 Order.belongsTo(InstallmentPlan, { foreignKey: 'installmentPlanId' });
@@ -73,8 +78,8 @@ Order.belongsTo(InstallmentPlan, { foreignKey: 'installmentPlanId' });
 Order.hasMany(OrderItem, { as: 'items', foreignKey: 'orderId' });
 OrderItem.belongsTo(Order, { foreignKey: 'orderId' });
 
-Product.hasMany(OrderItem, { foreignKey: 'productId' });
-OrderItem.belongsTo(Product, { foreignKey: 'productId' });
+Product.hasMany(OrderItem, { foreignKey: 'productId', onDelete: 'RESTRICT', onUpdate: 'CASCADE' });
+OrderItem.belongsTo(Product, { foreignKey: 'productId', onDelete: 'RESTRICT', onUpdate: 'CASCADE' });
 
 // Combos: un producto "combo" tiene componentes; un producto puede estar en varios combos
 Product.hasMany(ComboItem, { as: 'components', foreignKey: 'comboId', onDelete: 'CASCADE' });

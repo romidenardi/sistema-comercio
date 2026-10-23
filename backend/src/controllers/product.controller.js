@@ -1,8 +1,9 @@
 import pkg from 'sequelize';
-import { Product, ComboItem } from '../models/index.js';
+import { Product, ComboItem, Category, OrderItem, PurchaseItem, Order, Purchase } from '../models/index.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { httpError } from '../utils/httpError.js';
 import { withComboData } from '../services/combo.service.js';
+import { pick } from '../utils/pick.js';
 
 const { Op } = pkg;
 
@@ -52,6 +53,26 @@ const rethrowDuplicate = (err) => {
     throw httpError('Ese código de barras ya está asignado a otro producto', 409);
   }
   throw err;
+};
+
+// Campos que se pueden cargar o editar desde la API. El stock no está: solo cambia con
+// movimientos de stock, compras y remitos. Tampoco businessId, id, isCombo ni specialPrice.
+const PRODUCT_FIELDS = [
+  'internalCode', 'barcode', 'scalePlu', 'name', 'description', 'brand', 'model', 'unitType',
+  'price', 'promoPrice', 'cost', 'fiscalActivity', 'vatRate', 'otherTaxes', 'categoryId', 'active',
+];
+
+// La categoría tiene que ser del mismo comercio
+const resolveCategoryId = async (categoryId, businessId) => {
+  if (!categoryId) return null;
+  const category = await Category.findOne({ where: { id: categoryId, businessId } });
+  if (!category) throw httpError('La categoría no existe', 404);
+  return category.id;
+};
+
+const cleanPromoPrice = (data) => {
+  if ('promoPrice' in data && (data.promoPrice === '' || data.promoPrice === null)) data.promoPrice = null;
+  return data;
 };
 
 const ALLOWED_VAT_RATES = [0, 10.5, 21];
@@ -114,8 +135,8 @@ export const createProduct = asyncHandler(async (req, res) => {
   await assertScalePluFree(businessId, scalePlu);
 
   // Los combos se crean desde /combos: acá nunca
-  const { isCombo: _ignoredCombo, specialPrice: _ignoredSpecial, ...body } = req.body;
-  const data = normalizeTaxes({ ...body });
+  const data = cleanPromoPrice(normalizeTaxes(pick(req.body, PRODUCT_FIELDS)));
+  data.categoryId = await resolveCategoryId(data.categoryId, businessId);
 
   let product;
   try {
@@ -130,12 +151,11 @@ export const updateProduct = asyncHandler(async (req, res) => {
   const { businessId } = req.user;
   const product = await findOwnProduct(req.params.id, businessId);
 
-  const {
-    businessId: _ignoredBusiness, id: _ignoredId, isCombo: _ignoredCombo, specialPrice: _ignoredSpecial, ...data
-  } = req.body;
   if (product.isCombo) throw httpError('Los combos se editan desde la pestaña Combos', 400);
 
-  normalizeTaxes(data, product.vatRate);
+  // Solo los campos editables: nunca el comercio, el id ni el stock
+  const data = cleanPromoPrice(normalizeTaxes(pick(req.body, PRODUCT_FIELDS), product.vatRate));
+  if ('categoryId' in data) data.categoryId = await resolveCategoryId(data.categoryId, businessId);
 
   if ('barcode' in data) {
     data.barcode = cleanBarcode(data.barcode) ?? null;
@@ -170,6 +190,31 @@ export const deleteProduct = asyncHandler(async (req, res) => {
   if (usedIn.length) {
     const names = usedIn.map((item) => `"${item.combo?.name}"`).join(', ');
     throw httpError(`No se puede eliminar: forma parte de los combos ${names}`, 409);
+  }
+
+  // Un producto que ya se vendió o se compró no se borra: se perdería el historial
+  const [sold, bought] = await Promise.all([
+    Order.count({
+      where: { businessId: product.businessId },
+      include: [{ model: OrderItem, as: 'items', attributes: [], where: { productId: product.id } }],
+      distinct: true,
+    }),
+    Purchase.count({
+      where: { businessId: product.businessId },
+      include: [{ model: PurchaseItem, as: 'items', attributes: [], where: { productId: product.id } }],
+      distinct: true,
+    }),
+  ]);
+  if (sold > 0 || bought > 0) {
+    const parts = [
+      sold > 0 && `${sold} ${sold === 1 ? 'remito' : 'remitos'}`,
+      bought > 0 && `${bought} ${bought === 1 ? 'compra' : 'compras'}`,
+    ].filter(Boolean).join(' y ');
+    throw httpError(
+      `"${product.name}" aparece en ${parts} y no se puede eliminar, porque se perdería el historial. `
+      + 'Si ya no lo vendés, editalo y marcalo como inactivo.',
+      409
+    );
   }
 
   await product.destroy();

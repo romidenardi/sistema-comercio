@@ -21,9 +21,21 @@ const createRules = [
   }),
 ];
 
+const updateRules = [
+  body('fiscalCondition').optional().trim().notEmpty().withMessage('La condición fiscal no puede quedar vacía'),
+  body('email').optional({ values: 'falsy' }).isEmail().withMessage('El email no es válido'),
+  body().custom((_, { req }) => {
+    const touchesName = 'businessName' in req.body || 'firstName' in req.body;
+    if (touchesName && !req.body.businessName && !req.body.firstName) {
+      throw new Error('Debés completar razón social o nombre y apellido');
+    }
+    return true;
+  }),
+];
+
 router.get('/', getCustomers);
 router.post('/', requireRole('admin', 'editor'), createRules, validate, createCustomer);
-router.put('/:id', requireRole('admin', 'editor'), updateCustomer);
+router.put('/:id', requireRole('admin', 'editor'), updateRules, validate, updateCustomer);
 router.delete('/:id', requireRole('admin', 'editor'), deleteCustomer);
 
 export default router;

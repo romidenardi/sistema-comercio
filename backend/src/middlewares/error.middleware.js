@@ -28,6 +28,13 @@ export const errorMiddleware = (err, req, res, next) => {
     return res.status(409).json({ message: duplicateMessage(err) });
   }
 
+  // Respaldo de los chequeos de los controladores: la base rechazó borrar algo que tiene historial
+  if (err.name === 'SequelizeForeignKeyConstraintError') {
+    return res.status(409).json({
+      message: 'No se puede eliminar porque tiene remitos o compras asociados. Podés marcarlo como inactivo.',
+    });
+  }
+
   if (err.name === 'SequelizeValidationError') {
     const details = (err.errors || []).map((e) => e.message);
     const fields = [...new Set((err.errors || []).map((e) => e.path).filter(Boolean))].map(fieldLabel);

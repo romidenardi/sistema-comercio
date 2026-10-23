@@ -1,6 +1,10 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useToast } from '../context/ToastContext.jsx';
 
+// El mensaje que manda el servidor (por ejemplo, por qué no se puede borrar algo) o uno genérico
+const serverMessage = (err, fallback) =>
+  err.response?.data?.message || err.response?.data?.errors?.[0]?.msg || fallback;
+
 export const useResource = (api) => {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -29,7 +33,7 @@ export const useResource = (api) => {
       showToast('Creado correctamente');
       return { success: true };
     } catch (err) {
-      const message = err.response?.data?.message || err.response?.data?.errors?.[0]?.msg || 'Error al crear';
+      const message = serverMessage(err, 'Error al crear');
       showToast(message, 'error');
       return { success: false, message };
     }
@@ -42,8 +46,9 @@ export const useResource = (api) => {
       showToast('Actualizado correctamente');
       return { success: true };
     } catch (err) {
-      showToast('Error al actualizar', 'error');
-      return { success: false };
+      const message = serverMessage(err, 'Error al actualizar');
+      showToast(message, 'error');
+      return { success: false, message };
     }
   };
 
@@ -54,8 +59,9 @@ export const useResource = (api) => {
       showToast('Eliminado correctamente');
       return { success: true };
     } catch (err) {
-      showToast('Error al eliminar', 'error');
-      return { success: false };
+      const message = serverMessage(err, 'Error al eliminar');
+      showToast(message, 'error');
+      return { success: false, message };
     }
   };
 

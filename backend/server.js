@@ -4,6 +4,7 @@ dotenv.config();
 import app from './src/app.js';
 import { sequelize } from './src/models/index.js';
 import { startClosureScheduler } from './src/services/closureScheduler.service.js';
+import { startDemoResetJob } from './src/jobs/demoReset.job.js';
 
 const PORT = process.env.PORT || 3000;
 
@@ -32,6 +33,7 @@ const start = async () => {
     app.listen(PORT, () => console.log(`Servidor corriendo en puerto ${PORT}`));
 
     startClosureScheduler();
+    startDemoResetJob();
   } catch (error) {
     console.error('Error al iniciar:', error);
     process.exit(1);

@@ -199,7 +199,8 @@ const Purchases = () => {
 
   const supplierName = (id) => suppliers.find((s) => s.id === id)?.name || '—';
 
-  const supplierOptions = suppliers.map((s) => ({
+  // Los proveedores inactivos no se ofrecen (salvo el que ya está elegido)
+  const supplierOptions = suppliers.filter((s) => s.active !== false || s.id === selectedSupplierId).map((s) => ({
     value: s.id,
     label: s.name,
     detail: s.cuit ? `CUIT ${s.cuit}` : '',

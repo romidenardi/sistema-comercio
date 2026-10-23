@@ -38,6 +38,7 @@ const Suppliers = () => {
       address: supplier.address || '',
       city: supplier.city || '',
       province: supplier.province || '',
+      active: String(supplier.active ?? true),
     });
   };
 
@@ -171,6 +172,13 @@ const Suppliers = () => {
                         <label htmlFor={`edit-province-${supplier.id}`}>Provincia</label>
                         <input id={`edit-province-${supplier.id}`} {...editForm.register('province')} />
                       </div>
+                      <div className="field">
+                        <label htmlFor={`edit-active-${supplier.id}`}>Estado</label>
+                        <select id={`edit-active-${supplier.id}`} {...editForm.register('active')}>
+                          <option value="true">Activo</option>
+                          <option value="false">Inactivo (no aparece en Compras)</option>
+                        </select>
+                      </div>
                       <div className="inline-edit-actions">
                         <button type="submit">Guardar</button>
                         <button type="button" onClick={() => setEditingId(null)}>Cancelar</button>
@@ -180,7 +188,10 @@ const Suppliers = () => {
                   </td>
                 ) : (
                   <>
-                    <td data-label="Nombre">{supplier.name}</td>
+                    <td data-label="Nombre">
+                      {supplier.name}
+                      {supplier.active === false && <small> · Inactivo</small>}
+                    </td>
                     <td data-label="Contacto">{supplier.contactPerson || '—'}</td>
                     <td data-label="Teléfono">{supplier.phone || '—'}</td>
                     <td data-label="Localidad">{supplier.city || '—'}</td>
