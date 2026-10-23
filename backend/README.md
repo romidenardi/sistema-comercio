@@ -51,7 +51,7 @@ Al iniciar, el servidor valida las variables obligatorias, verifica que `JWT_SEC
 | `CORS_ORIGIN` | Sí en la práctica | Origen(es) permitido(s) del frontend, separados por coma y sin barra final. Si está vacío, el navegador no puede llamar a la API |
 | `PORT` | No | Puerto del servidor (por defecto 3000; Railway lo define solo) |
 | `NODE_ENV` | No | `production` en Railway (oculta detalles de errores) |
-| `DEMO_RESET_ENABLED` | No | `false` desactiva el reinicio nocturno de la demo (en staging va en `false`) |
+| `DEMO_RESET_ENABLED` | No | `false` desactiva el reinicio nocturno de la demo. En staging y local va en `false`; en producción no se carga (o `true`), porque los términos prometen el reinicio |
 | `SUPPORT_EMAIL` | Recomendada | Casilla de consultas que figura en los mails de baja. Valor actual: `hola@talarix.com.ar`. Cargarla en **ambos** entornos de Railway |
 | `DISABLE_AUTO_PURGE` | No | `true` desactiva el borrado automático de comercios dados de baja (ver "Baja de comercios") |
 | `MAIL_HOST`, `MAIL_PORT`, `MAIL_USER`, `MAIL_PASS`, `MAIL_FROM` | No | Envío de mails por SMTP (ver "Mails") |
@@ -108,6 +108,9 @@ Detalles que conviene saber:
 - Los remitos anulados (`status = 'cancelled'`) quedan en el historial y se excluyen de los reportes.
 - El código de barras de un producto es opcional y **único por comercio**. Los vacíos se guardan como `NULL`.
 - Los errores de unicidad responden `409` con un mensaje en castellano.
+- **Nada con historial se borra:** un cliente con remitos, un proveedor con compras, un producto vendido o comprado, un combo vendido o una forma de pago usada responden `409` con un mensaje que propone la alternativa (anonimizar al cliente, o marcar inactivo el proveedor o el producto). En la base, esas claves foráneas son `ON DELETE RESTRICT`. Los movimientos de stock sí se borran junto con un producto que nunca se usó.
+- **Ediciones:** cada controlador acepta solo los campos permitidos (`pick` de `utils/pick.js`). El stock y el `businessId` no se pueden cambiar desde la API; la categoría de un producto y la categoría padre se verifican contra el comercio.
+- Los errores de validación responden `400` con `message` (el primero, para mostrar) y `errors` (la lista completa).
 - **Productos por peso:** `unitType = 'weight'`. Su precio, costo y promo son **por kg** y las cantidades están en kg con hasta 3 decimales. Los productos por unidad solo admiten cantidades enteras (lo valida el servidor).
 - Stock y cantidades (`products.stock`, `order_items`, `purchase_items`, `stock_movements`) son `DECIMAL(12,3)`. Sequelize devuelve los DECIMAL como texto: los modelos usan `numericGetter` (`utils/decimalColumn.js`) para que lleguen como número, y las cuentas con cantidades se redondean con `round3`.
 - **Balanza:** cada producto por peso puede tener un `scalePlu` (1 a 9999), único por comercio. El comercio guarda en `businesses.scale_config` cómo se arma la etiqueta EAN-13 (prefijo, posición del PLU y del valor, si trae peso o importe, decimales, dígito de control). El valor de fábrica es el de Systel. La etiqueta se interpreta en el frontend; el backend solo guarda la configuración.
@@ -124,7 +127,7 @@ Detalles que conviene saber:
 - "Olvidé mi contraseña" responde siempre lo mismo, exista o no el email; no reenvía más de un mail por minuto y no envía nada a usuarios inactivos, comercios suspendidos ni cuentas demo. Los administradores de un comercio en baja sí pueden recuperarla, para poder exportar sus datos.
 - Protecciones: `helmet`, límite de intentos en login, activación, recuperar y restablecer contraseña, lista de orígenes CORS, validaciones numéricas y de pertenencia entre comercios.
 - La exportación tiene límite de 5 pedidos por hora por usuario.
-- Cuenta **demo** (`Business.type = 'demo'`): datos de ejemplo, con gestión de usuarios e importación bloqueadas. Nunca se da de baja ni se purga. El reinicio nocturno (03:00, hora de Buenos Aires) está programado en `jobs/demoReset.job.js`, pero **hoy no corre**: `startDemoResetJob` no se llama en `server.js` (pendiente B10 de la revisión de código).
+- Cuenta **demo** (`Business.type = 'demo'`): datos de ejemplo, se reinicia todas las noches a las 03:00 (hora de Buenos Aires; `jobs/demoReset.job.js`, encendido desde `server.js`), con gestión de usuarios e importación bloqueadas. Nunca se da de baja ni se purga. Con `DEMO_RESET_ENABLED=false` (staging y local) no se reinicia; en producción tiene que estar encendido porque los términos lo prometen.
 
 ## Mails
 
@@ -219,6 +222,32 @@ ALTER TABLE businesses ADD COLUMN delete_at DATETIME NULL
 ```
 La tabla `closure_records` la crea `sync` sola.
 
+**Sin borrado en cascada** (claves foráneas, 22/10/2026). Antes, borrar un cliente, proveedor o producto borraba sus remitos y compras. Para ver cómo están las claves y generar las sentencias:
+```sql
+SELECT k.TABLE_NAME AS tabla, k.COLUMN_NAME AS columna, k.CONSTRAINT_NAME AS clave, rc.DELETE_RULE AS al_borrar
+FROM information_schema.KEY_COLUMN_USAGE k
+JOIN information_schema.REFERENTIAL_CONSTRAINTS rc
+  ON rc.CONSTRAINT_SCHEMA = k.CONSTRAINT_SCHEMA AND rc.CONSTRAINT_NAME = k.CONSTRAINT_NAME
+WHERE k.TABLE_SCHEMA = DATABASE()
+  AND ((k.TABLE_NAME = 'orders' AND k.COLUMN_NAME IN ('customer_id', 'payment_id'))
+    OR (k.TABLE_NAME = 'purchases' AND k.COLUMN_NAME = 'supplier_id')
+    OR (k.TABLE_NAME IN ('order_items', 'purchase_items') AND k.COLUMN_NAME = 'product_id'))
+```
+Las 5 tienen que decir `RESTRICT`. Se aplicó así (mismos nombres en local, staging y producción), una sentencia por vez:
+```sql
+ALTER TABLE `order_items` DROP FOREIGN KEY `order_items_ibfk_2`
+ALTER TABLE `order_items` ADD CONSTRAINT `order_items_ibfk_2` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE
+ALTER TABLE `orders` DROP FOREIGN KEY `orders_ibfk_2`
+ALTER TABLE `orders` ADD CONSTRAINT `orders_ibfk_2` FOREIGN KEY (`customer_id`) REFERENCES `customers` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE
+ALTER TABLE `orders` DROP FOREIGN KEY `orders_ibfk_3`
+ALTER TABLE `orders` ADD CONSTRAINT `orders_ibfk_3` FOREIGN KEY (`payment_id`) REFERENCES `payments` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE
+ALTER TABLE `purchase_items` DROP FOREIGN KEY `purchase_items_ibfk_2`
+ALTER TABLE `purchase_items` ADD CONSTRAINT `purchase_items_ibfk_2` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE
+ALTER TABLE `purchases` DROP FOREIGN KEY `purchases_ibfk_2`
+ALTER TABLE `purchases` ADD CONSTRAINT `purchases_ibfk_2` FOREIGN KEY (`supplier_id`) REFERENCES `suppliers` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE
+```
+Una base nueva ya nace con `RESTRICT` (está declarado en `models/index.js`).
+
 **Productos por peso y balanza** (octubre 2026):
 ```sql
 ALTER TABLE businesses ADD COLUMN scale_config JSON NULL
@@ -290,4 +319,4 @@ Restaurar: servicio MySQL → Backups → elegir fecha → Restore → revisar �
 La versión vigente de los términos y del aviso de privacidad está en `src/utils/legal.js` y debe coincidir con `LEGAL_VERSION` del frontend. Hoy es un borrador (`2026-10-borrador-1`) pendiente de revisión legal. La casilla de contacto es `hola@talarix.com.ar`.
 
 ---
-Última actualización: 22/10/2026 (credenciales, rotación de claves y base local). 
+Última actualización: 22/10/2026 (credenciales, sin borrado en cascada y reinicio de la demo).
