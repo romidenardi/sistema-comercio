@@ -57,6 +57,12 @@ const User = sequelize.define('User', {
     type: DataTypes.BOOLEAN, 
     allowNull: false, 
     defaultValue: true },
+  // Se incrementa al cambiar o restablecer la contraseña: los tokens emitidos antes dejan de valer
+  tokenVersion: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    defaultValue: 0,
+    field: 'token_version' },
 }, {
   tableName: 'users',
 });

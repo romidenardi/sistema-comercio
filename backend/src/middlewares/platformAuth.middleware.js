@@ -10,7 +10,7 @@ export const platformAuthMiddleware = async (req, res, next) => {
 
   let decoded;
   try {
-    decoded = jwt.verify(authHeader.split(' ')[1], process.env.PLATFORM_JWT_SECRET);
+    decoded = jwt.verify(authHeader.split(' ')[1], process.env.PLATFORM_JWT_SECRET, { algorithms: ['HS256'] });
   } catch {
     return res.status(401).json({ message: 'Token inválido o expirado' });
   }

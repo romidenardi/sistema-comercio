@@ -38,23 +38,45 @@ app.use(helmet());
 app.use(cors({ origin: allowedOrigins.length ? allowedOrigins : false }));
 app.use(express.json({ limit: '1mb' }));
 
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 10,
+// ---- Límites de intentos ----
+const FIFTEEN_MINUTES = 15 * 60 * 1000;
+const TOO_MANY = { message: 'Demasiados intentos. Probá de nuevo en unos minutos.' };
+const emailKey = (prefix) => (req) => `${prefix}:${String(req.body?.email || '').trim().toLowerCase()}`;
+
+// Ingreso: solo cuentan los intentos fallidos (skipSuccessfulRequests). Por red (IP) el límite es
+// amplio, para que un local con varios empleados detrás de la misma conexión no se bloquee; por
+// cuenta es estricto, para frenar a quien prueba contraseñas desde muchas IP distintas.
+const loginByIp = rateLimit({
+  windowMs: FIFTEEN_MINUTES,
+  limit: 30,
+  skipSuccessfulRequests: true,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { message: 'Demasiados intentos. Probá de nuevo en unos minutos.' },
+  message: TOO_MANY,
 });
-app.use(
-  [
-    '/api/auth/login',
-    '/api/auth/activate',
-    '/api/auth/forgot-password',
-    '/api/auth/reset-password',
-    '/api/platform/login',
-  ],
-  authLimiter
-);
+const loginByAccount = (prefix) => rateLimit({
+  windowMs: FIFTEEN_MINUTES,
+  limit: 5,
+  skipSuccessfulRequests: true,
+  keyGenerator: emailKey(prefix),
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    message: 'Demasiados intentos fallidos con esta cuenta. Probá de nuevo en 15 minutos o recuperá la contraseña.',
+  },
+});
+app.use('/api/auth/login', loginByIp, loginByAccount('login'));
+app.use('/api/platform/login', loginByIp, loginByAccount('platform'));
+
+// Activar cuenta, recuperar y restablecer contraseña: cuentan todos los pedidos (mandan mails o usan links)
+const accountLinksLimiter = rateLimit({
+  windowMs: FIFTEEN_MINUTES,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: TOO_MANY,
+});
+app.use(['/api/auth/activate', '/api/auth/forgot-password', '/api/auth/reset-password'], accountLinksLimiter);
 
 app.use('/api/auth', authRoutes);
 app.use('/api/platform', platformRoutes);

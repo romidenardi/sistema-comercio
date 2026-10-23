@@ -6,16 +6,9 @@ import { httpError } from '../utils/httpError.js';
 import { hashToken } from '../utils/inviteToken.js';
 import { LEGAL_VERSION } from '../utils/legal.js';
 import { issueAccessLink, wasIssuedRecently } from '../utils/accessLinks.js';
+import { checkPassword } from '../utils/password.js';
 
-const MIN_PASSWORD_LENGTH = 8;
-const MAX_PASSWORD_LENGTH = 72; // límite de bcrypt
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-const checkPassword = (password) => {
-  if (password.length < MIN_PASSWORD_LENGTH || password.length > MAX_PASSWORD_LENGTH) {
-    throw httpError(`La contraseña debe tener entre ${MIN_PASSWORD_LENGTH} y ${MAX_PASSWORD_LENGTH} caracteres`);
-  }
-};
 
 export const login = asyncHandler(async (req, res) => {
   const email = String(req.body.email || '').trim().toLowerCase();
@@ -45,7 +38,8 @@ export const login = asyncHandler(async (req, res) => {
   await user.update({ lastLoginAt: new Date() });
 
   const token = jwt.sign(
-    { id: user.id, businessId: user.businessId, role: user.role },
+    // tv: versión de la sesión. Si la contraseña cambia, el middleware rechaza los tokens viejos
+    { id: user.id, businessId: user.businessId, role: user.role, tv: user.tokenVersion },
     process.env.JWT_SECRET,
     { expiresIn: '8h' }
   );
@@ -144,6 +138,7 @@ export const resetPassword = asyncHandler(async (req, res) => {
   user.passwordHash = await bcrypt.hash(password, 10);
   user.inviteTokenHash = null;
   user.inviteExpiresAt = null;
+  user.tokenVersion += 1; // cierra las sesiones abiertas con la contraseña anterior
   await user.save();
 
   res.json({ message: 'Contraseña actualizada. Ya podés iniciar sesión.' });

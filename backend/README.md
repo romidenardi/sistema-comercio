@@ -126,7 +126,13 @@ Detalles que conviene saber:
 - Los links de invitación (vencen a los 7 días) y de restablecer contraseña (vencen a la hora) son de un solo uso. En la base solo se guarda el hash del token.
 - La activación exige aceptar los términos y registra versión, fecha e IP de la aceptación.
 - "Olvidé mi contraseña" responde siempre lo mismo, exista o no el email; no reenvía más de un mail por minuto y no envía nada a usuarios inactivos, comercios suspendidos ni cuentas demo. Los administradores de un comercio en baja sí pueden recuperarla, para poder exportar sus datos.
-- Protecciones: `helmet`, límite de intentos en login, activación, recuperar y restablecer contraseña, lista de orígenes CORS, validaciones numéricas y de pertenencia entre comercios.
+- Protecciones: `helmet`, lista de orígenes CORS, validaciones numéricas y de pertenencia entre comercios, y límites de intentos (`app.js`):
+  - **Ingreso** (usuarios y superadmin): solo cuentan los intentos fallidos. 30 cada 15 minutos por IP (un local con varios empleados en la misma red no se bloquea) y 5 cada 15 minutos por cuenta (frena a quien prueba contraseñas desde muchas IP).
+  - **Activar, recuperar y restablecer contraseña:** 10 pedidos cada 15 minutos por IP.
+  - **Crear usuarios y enviar links** (mandan mails): 30 por día por comercio.
+  - Los contadores están en memoria: se reinician con cada deploy y no se comparten si algún día hay más de una instancia.
+- **Sesiones:** el token dura 8 h y lleva la versión de sesión del usuario (`tv`, columna `users.token_version`). Al restablecer la contraseña, o cuando el administrador le pone una nueva, la versión sube y las sesiones abiertas con la contraseña anterior dejan de valer. Cambiar el rol o desactivar al usuario se aplica en el pedido siguiente, porque el middleware los lee de la base. Cerrar sesión solo borra el token en ese navegador. Los tokens se verifican solo con `HS256`.
+- **Contraseñas:** mínimo 8 caracteres y máximo 72 **bytes** (el límite de bcrypt), en `utils/password.js`.
 - La exportación tiene límite de 5 pedidos por hora por usuario.
 - Cuenta **demo** (`Business.type = 'demo'`): datos de ejemplo, se reinicia todas las noches a las 03:00 (hora de Buenos Aires; `jobs/demoReset.job.js`, encendido desde `server.js`), con gestión de usuarios e importación bloqueadas. Nunca se da de baja ni se purga. Con `DEMO_RESET_ENABLED=false` (staging y local) no se reinicia; en producción tiene que estar encendido porque los términos lo prometen.
 
@@ -258,6 +264,11 @@ ALTER TABLE purchases ADD UNIQUE INDEX uq_purchases_business_request (business_i
 ```
 Los remitos y compras anteriores quedan con `request_id` en `NULL`, que el índice único admite.
 
+**Versión de sesión** (`users`, 23/10/2026). También **antes** de desplegar: el modelo lee la columna en cada ingreso y en cada pedido.
+```sql
+ALTER TABLE users ADD COLUMN token_version INT NOT NULL DEFAULT 0
+```
+
 **Productos por peso y balanza** (octubre 2026):
 ```sql
 ALTER TABLE businesses ADD COLUMN scale_config JSON NULL
@@ -329,4 +340,4 @@ Restaurar: servicio MySQL → Backups → elegir fecha → Restore → revisar �
 La versión vigente de los términos y del aviso de privacidad está en `src/utils/legal.js` y debe coincidir con `LEGAL_VERSION` del frontend. Hoy es un borrador (`2026-10-borrador-1`) pendiente de revisión legal. La casilla de contacto es `hola@talarix.com.ar`.
 
 ---
-Última actualización: 23/10/2026 (sin remitos ni compras duplicados).
+Última actualización: 23/10/2026 (sesiones, límites de intentos y contraseñas).

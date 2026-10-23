@@ -5,22 +5,16 @@ import { httpError } from '../utils/httpError.js';
 import { sendMail, appUrl } from '../utils/mailer.js';
 import { userCreatedEmail } from '../utils/mailTemplates.js';
 import { issueAccessLink } from '../utils/accessLinks.js';
+import { checkPassword } from '../utils/password.js';
 
 const ROLES = ['admin', 'editor', 'operador'];
-const MIN_PASSWORD_LENGTH = 8;
-const MAX_PASSWORD_LENGTH = 72;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const toSafeUser = (user) => {
-  const { passwordHash, inviteTokenHash, inviteExpiresAt, ...safe } = user.toJSON();
+  const { passwordHash, inviteTokenHash, inviteExpiresAt, tokenVersion, ...safe } = user.toJSON();
   return { ...safe, pendingActivation: !passwordHash };
 };
 
-const checkPassword = (password) => {
-  if (password.length < MIN_PASSWORD_LENGTH || password.length > MAX_PASSWORD_LENGTH) {
-    throw httpError(`La contraseña debe tener entre ${MIN_PASSWORD_LENGTH} y ${MAX_PASSWORD_LENGTH} caracteres`);
-  }
-};
 
 export const getUsers = asyncHandler(async (req, res) => {
   const users = await User.findAll({
@@ -118,6 +112,7 @@ export const updateUser = asyncHandler(async (req, res) => {
     user.passwordHash = await bcrypt.hash(String(password), 10);
     user.inviteTokenHash = null;
     user.inviteExpiresAt = null;
+    user.tokenVersion += 1; // cierra las sesiones abiertas con la contraseña anterior
   }
 
   await user.save();

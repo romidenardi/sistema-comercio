@@ -16,7 +16,7 @@ const buildAuthMiddleware = ({ allowClosing }) => async (req, res, next) => {
 
   let decoded;
   try {
-    decoded = jwt.verify(authHeader.split(' ')[1], process.env.JWT_SECRET);
+    decoded = jwt.verify(authHeader.split(' ')[1], process.env.JWT_SECRET, { algorithms: ['HS256'] });
   } catch {
     return res.status(401).json({ message: 'Token inválido o expirado' });
   }
@@ -33,12 +33,17 @@ const buildAuthMiddleware = ({ allowClosing }) => async (req, res, next) => {
         active: true,
         passwordHash: { [Op.ne]: null },
       },
-      attributes: ['id', 'businessId', 'role'],
+      attributes: ['id', 'businessId', 'role', 'tokenVersion'],
       include: [{ model: Business, attributes: ['status', 'type'] }],
     });
 
     if (!user) {
       return res.status(401).json({ message: 'Sesión inválida' });
+    }
+
+    // La contraseña cambió después de emitir este token: hay que volver a ingresar
+    if ((decoded.tv ?? 0) !== user.tokenVersion) {
+      return res.status(401).json({ message: 'Tu sesión se cerró porque cambió la contraseña. Ingresá de nuevo.' });
     }
 
     const status = user.Business.status;
