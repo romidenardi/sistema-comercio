@@ -121,8 +121,17 @@ const Order = sequelize.define('Order', {
     allowNull: true,
     field: 'cancelled_by_id',
   },
+  // Identificador del envío desde el frontend, para no crear dos veces el mismo (ver utils/requestId.js)
+  requestId: {
+    type: DataTypes.UUID,
+    allowNull: true,
+    field: 'request_id',
+  },
 }, {
   tableName: 'orders',
+  indexes: [
+    { unique: true, fields: ['business_id', 'request_id'], name: 'uq_orders_business_request' },
+  ],
 });
 
 export default Order;

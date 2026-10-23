@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { getPurchases, createPurchase } from '../../api/purchases.api.js';
 import { getSuppliers, createSupplier } from '../../api/suppliers.api.js';
@@ -10,6 +10,7 @@ import ScanBar from '../../components/common/ScanBar.jsx';
 import SearchSelect from '../../components/common/SearchSelect.jsx';
 import VatSelect from '../../components/common/VatSelect.jsx';
 import { toPercentOrNull } from '../../utils/taxes.js';
+import { newRequestId } from '../../utils/requestId.js';
 import { formatQuantity, quantityStep, quantityMin, toKg } from '../../utils/quantity.js';
 import { RequiredMark, RequiredLegend } from '../../components/common/Required.jsx';
 
@@ -40,7 +41,9 @@ const Purchases = () => {
   const { role } = useAuth();
   const canManageData = role === 'admin' || role === 'editor';
 
-  const { register, control, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm({
+  const {
+    register, control, handleSubmit, reset, watch, setValue, formState: { errors, isSubmitting },
+  } = useForm({
     defaultValues: emptyForm(),
   });
 
@@ -118,7 +121,22 @@ const Purchases = () => {
     }
   };
 
+  // Evita el doble envío: el botón se deshabilita mientras se envía (isSubmitting) y, por si dos
+  // clics llegan antes de que se redibuje, sendingRef corta el segundo. requestIdRef identifica el
+  // envío: si el servidor ya lo recibió, devuelve el mismo compra en lugar de crear otro.
+  const sendingRef = useRef(false);
+  const requestIdRef = useRef(newRequestId());
   const onSubmit = async (formData) => {
+    if (sendingRef.current) return;
+    sendingRef.current = true;
+    try {
+      await submitPurchase(formData);
+    } finally {
+      sendingRef.current = false;
+    }
+  };
+
+  const submitPurchase = async (formData) => {
     try {
       if (isNewSupplier && !formData.newSupplier.name) {
         showToast('Completá el nombre del proveedor nuevo', 'error');
@@ -187,8 +205,10 @@ const Purchases = () => {
         supplierId,
         invoiceNumber: formData.invoiceNumber || null,
         items: payloadItems,
+        requestId: requestIdRef.current,
       };
       await createPurchase(payload);
+      requestIdRef.current = newRequestId();
       showToast('Compra registrada, stock actualizado');
       reset(emptyForm());
       loadAll();
@@ -438,7 +458,9 @@ const Purchases = () => {
 
         <div className="purchase-total">Total: ${total.toFixed(2)}</div>
 
-        <button type="submit">Registrar compra</button>
+        <button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? 'Registrando compra…' : 'Registrar compra'}
+        </button>
         <RequiredLegend />
       </form>
 

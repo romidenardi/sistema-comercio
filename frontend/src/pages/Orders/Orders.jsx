@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { getOrders, createOrder, cancelOrder } from '../../api/orders.api.js';
@@ -6,6 +6,7 @@ import { getCustomers, createCustomer } from '../../api/customers.api.js';
 import { getPayments } from '../../api/payments.api.js';
 import { getProducts, createProduct } from '../../api/products.api.js';
 import { getScaleConfig } from '../../api/scale.api.js';
+import { newRequestId } from '../../utils/requestId.js';
 import { useToast } from '../../context/ToastContext.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
 import Spinner from '../../components/common/Spinner.jsx';
@@ -45,7 +46,9 @@ const Orders = () => {
   const { role } = useAuth();
   const canManageData = role === 'admin' || role === 'editor';
 
-  const { register, control, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm({
+  const {
+    register, control, handleSubmit, reset, watch, setValue, formState: { errors, isSubmitting },
+  } = useForm({
     defaultValues: {
       customerId: '',
       paymentId: '',
@@ -257,7 +260,22 @@ const Orders = () => {
     }
   };
 
+  // Evita el doble envío: el botón se deshabilita mientras se envía (isSubmitting) y, por si dos
+  // clics llegan antes de que se redibuje, sendingRef corta el segundo. requestIdRef identifica el
+  // envío: si el servidor ya lo recibió, devuelve el mismo remito en lugar de crear otro.
+  const sendingRef = useRef(false);
+  const requestIdRef = useRef(newRequestId());
   const onSubmit = async (formData) => {
+    if (sendingRef.current) return;
+    sendingRef.current = true;
+    try {
+      await submitOrder(formData);
+    } finally {
+      sendingRef.current = false;
+    }
+  };
+
+  const submitOrder = async (formData) => {
     if (discountExceedsTotal) {
       showToast('El descuento no puede ser mayor al total del remito', 'error');
       return;
@@ -341,9 +359,11 @@ const Orders = () => {
         discountAmount: Number(formData.discountAmount) || 0,
         notes: formData.notes || null,
         items: payloadItems,
+        requestId: requestIdRef.current,
       };
 
       await createOrder(payload);
+      requestIdRef.current = newRequestId();
       showToast('Remito generado, stock actualizado');
       reset({
         customerId: '',
@@ -745,7 +765,9 @@ const Orders = () => {
           )}
         </div>
 
-        <button type="submit" disabled={discountExceedsTotal}>Generar remito</button>
+        <button type="submit" disabled={discountExceedsTotal || isSubmitting}>
+          {isSubmitting ? 'Generando remito…' : 'Generar remito'}
+        </button>
         <RequiredLegend />
       </form>
 

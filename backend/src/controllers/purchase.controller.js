@@ -1,4 +1,5 @@
 import { Purchase, PurchaseItem, Product, Supplier, StockMovement, sequelize } from '../models/index.js';
+import { cleanRequestId, isDuplicateRequest } from '../utils/requestId.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { httpError } from '../utils/httpError.js';
 import {
@@ -26,6 +27,17 @@ export const getPurchases = asyncHandler(async (req, res) => {
 export const createPurchase = asyncHandler(async (req, res) => {
   const { supplierId, invoiceNumber, date, items } = req.body;
   const { businessId } = req.user;
+  const requestId = cleanRequestId(req.body.requestId);
+
+  // El mismo envío ya se procesó (doble clic o reintento): se devuelve esa compra, no se crea otra
+  const sendExisting = async (id) => {
+    const existing = await Purchase.findOne({ where: { id, businessId }, include: purchaseIncludes });
+    res.status(200).json(existing);
+  };
+  if (requestId) {
+    const previous = await Purchase.findOne({ where: { businessId, requestId }, attributes: ['id'] });
+    if (previous) return sendExisting(previous.id);
+  }
 
   if (!Array.isArray(items) || items.length === 0) {
     throw httpError('La compra debe tener al menos un artículo');
@@ -84,6 +96,7 @@ export const createPurchase = asyncHandler(async (req, res) => {
       invoiceNumber,
       date: purchaseDate,
       total: round2(total),
+      requestId,
       businessId,
     }, { transaction: t });
     purchaseId = purchase.id;
@@ -114,6 +127,11 @@ export const createPurchase = asyncHandler(async (req, res) => {
     await t.commit();
   } catch (error) {
     await t.rollback();
+    // Dos envíos iguales al mismo tiempo: el otro ya la creó
+    if (requestId && isDuplicateRequest(error)) {
+      const previous = await Purchase.findOne({ where: { businessId, requestId }, attributes: ['id'] });
+      if (previous) return sendExisting(previous.id);
+    }
     throw error;
   }
 

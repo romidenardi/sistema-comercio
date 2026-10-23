@@ -110,6 +110,7 @@ Detalles que conviene saber:
 - Los errores de unicidad responden `409` con un mensaje en castellano.
 - **Nada con historial se borra:** un cliente con remitos, un proveedor con compras, un producto vendido o comprado, un combo vendido o una forma de pago usada responden `409` con un mensaje que propone la alternativa (anonimizar al cliente, o marcar inactivo el proveedor o el producto). En la base, esas claves foráneas son `ON DELETE RESTRICT`. Los movimientos de stock sí se borran junto con un producto que nunca se usó.
 - **Ediciones:** cada controlador acepta solo los campos permitidos (`pick` de `utils/pick.js`). El stock y el `businessId` no se pueden cambiar desde la API; la categoría de un producto y la categoría padre se verifican contra el comercio.
+- **Sin remitos ni compras duplicados:** el frontend manda un `requestId` (UUID) con cada remito y cada compra, y deshabilita el botón mientras envía. Si el mismo `requestId` llega dos veces (doble clic, reintento por un corte de red), el servidor responde `200` con el remito o la compra que ya creó, en lugar de crear otro. Es único por comercio (`uq_orders_business_request`, `uq_purchases_business_request`).
 - Los errores de validación responden `400` con `message` (el primero, para mostrar) y `errors` (la lista completa).
 - **Productos por peso:** `unitType = 'weight'`. Su precio, costo y promo son **por kg** y las cantidades están en kg con hasta 3 decimales. Los productos por unidad solo admiten cantidades enteras (lo valida el servidor).
 - Stock y cantidades (`products.stock`, `order_items`, `purchase_items`, `stock_movements`) son `DECIMAL(12,3)`. Sequelize devuelve los DECIMAL como texto: los modelos usan `numericGetter` (`utils/decimalColumn.js`) para que lleguen como número, y las cuentas con cantidades se redondean con `round3`.
@@ -248,6 +249,15 @@ ALTER TABLE `purchases` ADD CONSTRAINT `purchases_ibfk_2` FOREIGN KEY (`supplier
 ```
 Una base nueva ya nace con `RESTRICT` (está declarado en `models/index.js`).
 
+**Envíos duplicados** (`orders`, `purchases`, 23/10/2026). Hay que correrlo **antes** de desplegar el código: si el índice está declarado y la columna no existe, `sync` falla y el servidor no arranca.
+```sql
+ALTER TABLE orders ADD COLUMN request_id CHAR(36) BINARY NULL
+ALTER TABLE orders ADD UNIQUE INDEX uq_orders_business_request (business_id, request_id)
+ALTER TABLE purchases ADD COLUMN request_id CHAR(36) BINARY NULL
+ALTER TABLE purchases ADD UNIQUE INDEX uq_purchases_business_request (business_id, request_id)
+```
+Los remitos y compras anteriores quedan con `request_id` en `NULL`, que el índice único admite.
+
 **Productos por peso y balanza** (octubre 2026):
 ```sql
 ALTER TABLE businesses ADD COLUMN scale_config JSON NULL
@@ -319,4 +329,4 @@ Restaurar: servicio MySQL → Backups → elegir fecha → Restore → revisar �
 La versión vigente de los términos y del aviso de privacidad está en `src/utils/legal.js` y debe coincidir con `LEGAL_VERSION` del frontend. Hoy es un borrador (`2026-10-borrador-1`) pendiente de revisión legal. La casilla de contacto es `hola@talarix.com.ar`.
 
 ---
-Última actualización: 22/10/2026 (credenciales, sin borrado en cascada y reinicio de la demo).
+Última actualización: 23/10/2026 (sin remitos ni compras duplicados).

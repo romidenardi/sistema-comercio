@@ -5,6 +5,7 @@ import { asyncHandler } from '../utils/asyncHandler.js';
 import { httpError } from '../utils/httpError.js';
 import { splitPrice, splitLineParts } from '../utils/taxes.js';
 import { loadComboComponents } from '../services/combo.service.js';
+import { cleanRequestId, isDuplicateRequest } from '../utils/requestId.js';
 import {
   isPositiveQuantity, isNonNegative, toNumber, toNumberOrZero, round2, round3,
   quantityAllowedFor, unitWord,
@@ -44,6 +45,17 @@ export const getOrder = asyncHandler(async (req, res) => {
 export const createOrder = asyncHandler(async (req, res) => {
   const { customerId, paymentId, installmentPlanId, items, notes } = req.body;
   const { businessId, role } = req.user;
+  const requestId = cleanRequestId(req.body.requestId);
+
+  // El mismo envío ya se procesó (doble clic o reintento): se devuelve ese remito, no se crea otro
+  const sendExisting = async (id) => {
+    const existing = await Order.findOne({ where: { id, businessId }, include: orderIncludes });
+    res.status(200).json(existing);
+  };
+  if (requestId) {
+    const previous = await Order.findOne({ where: { businessId, requestId }, attributes: ['id'] });
+    if (previous) return sendExisting(previous.id);
+  }
 
   // ---- Validación de entrada ----
   if (!Array.isArray(items) || items.length === 0) {
@@ -227,6 +239,7 @@ export const createOrder = asyncHandler(async (req, res) => {
       interestRate,
       installmentAmount,
       totalFinanced,
+      requestId,
       businessId,
     }, { transaction: t });
     orderId = order.id;
@@ -268,6 +281,11 @@ export const createOrder = asyncHandler(async (req, res) => {
     await t.commit();
   } catch (error) {
     await t.rollback();
+    // Dos envíos iguales al mismo tiempo: el otro ya lo creó
+    if (requestId && isDuplicateRequest(error)) {
+      const previous = await Order.findOne({ where: { businessId, requestId }, attributes: ['id'] });
+      if (previous) return sendExisting(previous.id);
+    }
     throw error;
   }
 
