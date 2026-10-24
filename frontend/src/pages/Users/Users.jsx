@@ -4,6 +4,7 @@ import { useResource } from '../../hooks/useResource.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import * as usersApi from '../../api/users.api.js';
 import Spinner from '../../components/common/Spinner.jsx';
+import { validatePassword, validateOptionalPassword } from '../../utils/password.js';
 import { RequiredMark, RequiredLegend } from '../../components/common/Required.jsx';
 
 const api = {
@@ -195,7 +196,7 @@ const UsersContent = ({ notice, setNotice, reload }) => {
               placeholder="Mínimo 8 caracteres"
               {...register('password', {
                 required: 'La contraseña es obligatoria',
-                minLength: { value: 8, message: 'La contraseña debe tener al menos 8 caracteres' },
+                validate: validatePassword,
               })}
             />
             {errors.password && <span className="error">{errors.password.message}</span>}
@@ -247,8 +248,11 @@ const UsersContent = ({ notice, setNotice, reload }) => {
                             type="password"
                             autoComplete="new-password"
                             placeholder="Dejar vacío para no cambiarla"
-                            {...editForm.register('password', { minLength: 8 })}
+                            {...editForm.register('password', { validate: validateOptionalPassword })}
                           />
+                          {editForm.formState.errors.password && (
+                            <span className="error">{editForm.formState.errors.password.message}</span>
+                          )}
                         </div>
                         <div className="field">
                           <label htmlFor={`edit-role-${user.id}`}>Rol</label>

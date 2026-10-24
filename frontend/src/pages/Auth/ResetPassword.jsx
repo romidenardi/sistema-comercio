@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { resetPassword } from '../../api/auth.api.js';
+import { passwordProblem } from '../../utils/password.js';
 
 export default function ResetPassword() {
   const [searchParams] = useSearchParams();
@@ -17,7 +18,8 @@ export default function ResetPassword() {
     e.preventDefault();
     setError('');
 
-    if (password.length < 8) return setError('La contraseña debe tener al menos 8 caracteres');
+    const problem = passwordProblem(password);
+    if (problem) return setError(problem);
     if (password !== confirm) return setError('Las contraseñas no coinciden');
 
     setLoading(true);

@@ -62,6 +62,9 @@ const Imports = () => {
       <p className="import-hint">
         Columnas esperadas para <strong>{current.label}</strong>: {current.columns}
       </p>
+      <p className="import-hint">
+        Archivos .xlsx, .xls o .csv de hasta 5 MB y 5.000 filas. Se lee solo la primera hoja.
+      </p>
 
       {result && (
         <div className="import-result">

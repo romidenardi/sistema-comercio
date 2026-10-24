@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import api from '../../api/axios';
 import { LEGAL_VERSION } from '../../legal/legalContent';
+import { passwordProblem } from '../../utils/password.js';
 
 export default function Activate() {
   const [searchParams] = useSearchParams();
@@ -19,7 +20,8 @@ export default function Activate() {
     e.preventDefault();
     setError('');
 
-    if (password.length < 8) return setError('La contraseña debe tener al menos 8 caracteres');
+    const problem = passwordProblem(password);
+    if (problem) return setError(problem);
     if (password !== confirm) return setError('Las contraseñas no coinciden');
     if (!accepted) return setError('Tenés que aceptar los Términos y Condiciones y el Aviso de Privacidad');
 
