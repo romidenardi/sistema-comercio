@@ -1538,3 +1538,54 @@ td .form-message {
   margin-top: 6px;
   min-width: 220px;
 }
+
+/* ---- Segundo factor del superadmin (pages/Platform/PlatformLogin.jsx) ---- */
+.mfa-qr {
+  display: block;
+  width: 220px;
+  height: 220px;
+  margin: 8px auto 12px;
+  background: #fff;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.mfa-secret {
+  word-break: break-all;
+  font-family: 'DM Mono', monospace;
+}
+
+.recovery-codes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 16px;
+  margin: 12px 0;
+  padding: 12px 16px;
+  list-style: none;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.recovery-codes code {
+  font-family: 'DM Mono', monospace;
+  font-size: 15px;
+  letter-spacing: 0.04em;
+}
+
+.recovery-confirm {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+/* ---- Actividad (registro de auditoría) en /plataforma ---- */
+.audit-detail {
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.audit-warning td {
+  background: var(--color-danger-bg, #fdecec);
+}

@@ -69,6 +69,8 @@ src/
 - `src/api/axios.js` agrega el token a cada pedido y, ante un `401` (salvo en el login), borra la sesión y vuelve a `/login`.
 - Ante un `403` con `code: 'ACCOUNT_CLOSING'`, marca el comercio como `closing` en `localStorage` y redirige a `/exportar`.
 - El token del superadmin se guarda aparte, en `sessionStorage`.
+- **Ingreso del superadmin** (`pages/Platform/PlatformLogin.jsx`), en pasos: contraseña → código de 6 dígitos de Google Authenticator (o un código de recuperación). La primera vez, en lugar del código, muestra el QR para agregar Talarix a la app, pide el primer código y muestra los 10 códigos de recuperación una sola vez (hay que tildar "Ya los guardé" para seguir). Avisa si se entró con un código de recuperación o si quedan 3 o menos.
+- **Actividad** (`pages/Platform/AuditLog.jsx`): al pie de `/plataforma`, los últimos 200 registros del log de auditoría (fecha, quién, comercio, acción, detalle e IP). Los ingresos fallidos y el uso de códigos de recuperación se resaltan. Para una acción nueva del backend, agregar su texto en `ACTION_LABELS`.
 
 ## Funciones a tener en cuenta
 - **Códigos de barras:** se pueden cargar y buscar con la **cámara del celular** (librería `html5-qrcode`) o con un **lector USB**, que funciona como teclado: escribe el código y envía Enter. Dentro de los campos de código de barras el Enter está bloqueado para no enviar el formulario por error. La cámara solo funciona con **HTTPS** (en `localhost` también).
@@ -112,4 +114,4 @@ Se editan en `src/legal/legalContent.js`. Hoy están en borrador (`LEGAL_VERSION
 Flujo de trabajo, cambios en la base y variables del servidor: ver el README del backend. Recordá hacer `git add` y `commit` desde la **raíz del repo**.
 
 ---
-Última actualización: 23/10/2026 (avisos en el lugar de la acción).
+Última actualización: 24/10/2026 (segundo factor del superadmin y actividad).

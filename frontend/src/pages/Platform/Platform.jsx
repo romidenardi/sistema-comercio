@@ -11,6 +11,7 @@ import {
   startBusinessClosure,
   cancelBusinessClosure,
 } from '../../api/platform.api';
+import AuditLog from './AuditLog';
 
 const EMPTY_FORM = { name: '', adminName: '', adminEmail: '', type: 'client', trialDays: '' };
 
@@ -381,6 +382,8 @@ export default function Platform() {
           </div>
         )}
       </section>
+
+      <AuditLog />
     </div>
   );
 }

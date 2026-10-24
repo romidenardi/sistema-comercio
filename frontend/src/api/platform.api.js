@@ -34,6 +34,11 @@ platformApi.interceptors.response.use(
 );
 
 export const platformLogin = (data) => platformApi.post('/platform/login', data);
+// Segundo paso del ingreso (código de la app o de recuperación) y configuración inicial
+export const platformLoginMfa = (mfaToken, code) => platformApi.post('/platform/login/mfa', { mfaToken, code });
+export const platformMfaSetup = (mfaToken) => platformApi.post('/platform/login/mfa/setup', { mfaToken });
+export const platformMfaEnable = (mfaToken, code) => platformApi.post('/platform/login/mfa/enable', { mfaToken, code });
+export const getAuditLog = (params = {}) => platformApi.get('/platform/audit', { params });
 export const getBusinesses = () => platformApi.get('/platform/businesses');
 export const createBusiness = (data) => platformApi.post('/platform/businesses', data);
 export const setBusinessStatus = (id, status) =>
