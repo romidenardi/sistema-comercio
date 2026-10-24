@@ -13,6 +13,9 @@ import { matchesSearch } from '../../utils/search.js';
 import VatSelect from '../../components/common/VatSelect.jsx';
 import { toPercentOrNull, vatToFormValue } from '../../utils/taxes.js';
 import { formatQuantity, PRICE_BASES, toPricePerKg, perKg } from '../../utils/quantity.js';
+import FormMessage from '../../components/common/FormMessage.jsx';
+import { useMessage } from '../../hooks/useMessage.js';
+import { applyServerFieldErrors, fieldFromMessage } from '../../utils/serverErrors.js';
 import { RequiredMark, RequiredLegend } from '../../components/common/Required.jsx';
 
 const api = {
@@ -23,17 +26,34 @@ const api = {
 };
 
 const Products = () => {
-  const { items: products, loading, create, update, remove, reload } = useResource(api);
+  const { items: products, loading, loadError, create, update, remove, reload } = useResource(api);
+  const msg = useMessage();
+
+  // Campos que el servidor puede marcar, y errores del servidor que hablan de un campo concreto
+  const PRODUCT_FIELDS = ['internalCode', 'barcode', 'scalePlu', 'name', 'price', 'cost'];
+  const MESSAGE_FIELDS = {
+    barcode: /código de barras/i,
+    scalePlu: /PLU/i,
+  };
+  // Muestra el error del servidor debajo del campo que corresponda, o junto al botón
+  const showServerError = (result, form, key) => {
+    if (applyServerFieldErrors(result.error, form.setError, PRODUCT_FIELDS)) return;
+    const field = fieldFromMessage(result.message, MESSAGE_FIELDS);
+    if (field) form.setError(field, { type: 'server', message: result.message });
+    else msg.error(result.message, key);
+  };
   const [categories, setCategories] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [stockPanelId, setStockPanelId] = useState(null);
   const [search, setSearch] = useState('');
   const [tab, setTab] = useState('products'); // 'products' | 'combos' | 'scale'
 
-  const { register, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm({
+  const createForm = useForm({
     defaultValues: { unitType: 'unit', vatRate: '21', priceBase: '1000' },
   });
+  const { register, handleSubmit, reset, setValue, watch, formState: { errors } } = createForm;
   const editForm = useForm();
+  const { errors: editErrors } = editForm.formState;
   const createUnitType = watch('unitType');
   const editUnitType = editForm.watch('unitType');
   const createPriceBase = watch('priceBase');
@@ -84,11 +104,17 @@ const Products = () => {
       categoryId: formData.categoryId || null,
       scalePlu: formData.unitType === 'weight' && formData.scalePlu ? Number(formData.scalePlu) : null,
     });
-    if (result.success) reset({ unitType: 'unit', vatRate: '21', priceBase: '1000' });
+    if (result.success) {
+      reset({ unitType: 'unit', vatRate: '21', priceBase: '1000' });
+      msg.success('Producto agregado', 'create');
+    } else {
+      showServerError(result, createForm, 'create');
+    }
   };
 
   const startEdit = (product) => {
     setEditingId(product.id);
+    msg.clear();
     setStockPanelId(null);
     editForm.reset({
       internalCode: product.internalCode || '',
@@ -121,11 +147,20 @@ const Products = () => {
       scalePlu: formData.unitType === 'weight' && formData.scalePlu ? Number(formData.scalePlu) : null,
       active: formData.active === 'true',
     });
-    if (result.success) setEditingId(null);
+    if (result.success) {
+      const savedId = editingId;
+      setEditingId(null);
+      msg.success('Cambios guardados', savedId);
+    } else {
+      showServerError(result, editForm, 'edit');
+    }
   };
 
-  const onDelete = (id) => {
-    if (confirm('¿Eliminar este producto?')) remove(id);
+  const onDelete = async (id) => {
+    if (!confirm('¿Eliminar este producto?')) return;
+    const result = await remove(id);
+    if (result.success) msg.success('Producto eliminado', 'list');
+    else msg.error(result.message, id);
   };
 
   const categoryName = (categoryId) =>
@@ -176,6 +211,7 @@ const Products = () => {
     <div className="products-page">
       <h1>Productos</h1>
       {tabs}
+      <FormMessage message={loadError ? { type: 'error', text: loadError } : null} />
 
       <form onSubmit={handleSubmit(onCreate)} className="product-form">
         <div className="field">
@@ -202,6 +238,7 @@ const Products = () => {
               Cámara
             </button>
           </div>
+          {errors.barcode && <span className="error">{errors.barcode.message}</span>}
         </div>
 
         <div className="field">
@@ -250,6 +287,7 @@ const Products = () => {
               placeholder="Ej: 417"
               {...register('scalePlu')}
             />
+            {errors.scalePlu && <span className="error">{errors.scalePlu.message}</span>}
           </div>
         )}
 
@@ -264,7 +302,8 @@ const Products = () => {
 
         <div className="field">
           <label htmlFor="price">Precio{createUnitType === 'weight' ? ' (por la cantidad elegida)' : ''}<RequiredMark /></label>
-          <input id="price" type="number" step="0.01" placeholder="Ej: 1500" {...register('price', { required: 'Obligatorio', min: 0 })} />
+          <input id="price" type="number" step="0.01" placeholder="Ej: 1500" {...register('price', { required: 'El precio es obligatorio', min: { value: 0, message: 'El precio no puede ser negativo' } })} />
+          {errors.price && <span className="error">{errors.price.message}</span>}
         </div>
 
         {perKgHint(createUnitType, createPriceBase, createPrice) && (
@@ -275,12 +314,14 @@ const Products = () => {
 
         <div className="field">
           <label htmlFor="promoPrice">Precio promocional</label>
-          <input id="promoPrice" type="number" step="0.01" placeholder="Ej: 1350" {...register('promoPrice')} />
+          <input id="promoPrice" type="number" step="0.01" placeholder="Ej: 1350" {...register('promoPrice', { min: { value: 0, message: 'El precio no puede ser negativo' } })} />
+          {errors.promoPrice && <span className="error">{errors.promoPrice.message}</span>}
         </div>
 
         <div className="field">
           <label htmlFor="cost">Costo<RequiredMark /></label>
-          <input id="cost" type="number" step="0.01" placeholder="Ej: 900" {...register('cost', { required: 'Obligatorio', min: 0 })} />
+          <input id="cost" type="number" step="0.01" placeholder="Ej: 900" {...register('cost', { required: 'El costo es obligatorio', min: { value: 0, message: 'El costo no puede ser negativo' } })} />
+          {errors.cost && <span className="error">{errors.cost.message}</span>}
         </div>
 
         <div className="field">
@@ -306,11 +347,8 @@ const Products = () => {
           <textarea id="description" placeholder="Ej: Cerveza artesanal estilo IPA, botella 500ml" {...register('description')} />
         </div>
 
-        {(errors.internalCode || errors.name || errors.price || errors.cost) && (
-          <span className="error">Completá los campos obligatorios</span>
-        )}
-
         <button type="submit">Agregar producto</button>
+        <FormMessage message={msg.at('create')} onClose={msg.clear} />
         <RequiredLegend />
       </form>
 
@@ -322,6 +360,7 @@ const Products = () => {
         onChange={setSearch}
       />
 
+      <FormMessage message={msg.at('list')} />
       <div className="table-wrapper">
         <table>
           <thead>
@@ -352,7 +391,8 @@ const Products = () => {
                       <form onSubmit={editForm.handleSubmit(onUpdate)} className="inline-edit-form">
                         <div className="field">
                           <label htmlFor={`edit-internalCode-${product.id}`}>Código interno<RequiredMark /></label>
-                          <input id={`edit-internalCode-${product.id}`} {...editForm.register('internalCode')} />
+                          <input id={`edit-internalCode-${product.id}`} {...editForm.register('internalCode', { required: 'El código interno es obligatorio' })} />
+                          {editErrors.internalCode && <span className="error">{editErrors.internalCode.message}</span>}
                         </div>
                         <div className="field">
                           <label htmlFor={`edit-barcode-${product.id}`}>Código de barras</label>
@@ -372,10 +412,12 @@ const Products = () => {
                               Cámara
                             </button>
                           </div>
+                          {editErrors.barcode && <span className="error">{editErrors.barcode.message}</span>}
                         </div>
                         <div className="field">
                           <label htmlFor={`edit-name-${product.id}`}>Producto<RequiredMark /></label>
-                          <input id={`edit-name-${product.id}`} {...editForm.register('name')} />
+                          <input id={`edit-name-${product.id}`} {...editForm.register('name', { required: 'El nombre es obligatorio' })} />
+                          {editErrors.name && <span className="error">{editErrors.name.message}</span>}
                         </div>
                         <div className="field">
                           <label htmlFor={`edit-brand-${product.id}`}>Marca</label>
@@ -413,6 +455,7 @@ const Products = () => {
                               placeholder="Ej: 417"
                               {...editForm.register('scalePlu')}
                             />
+                            {editErrors.scalePlu && <span className="error">{editErrors.scalePlu.message}</span>}
                           </div>
                         )}
                         {editUnitType === 'weight' && (
@@ -425,7 +468,8 @@ const Products = () => {
                         )}
                         <div className="field">
                           <label htmlFor={`edit-price-${product.id}`}>Precio{editUnitType === 'weight' ? ' (por la cantidad elegida)' : ''}<RequiredMark /></label>
-                          <input id={`edit-price-${product.id}`} type="number" step="0.01" {...editForm.register('price')} />
+                          <input id={`edit-price-${product.id}`} type="number" step="0.01" {...editForm.register('price', { required: 'El precio es obligatorio', min: { value: 0, message: 'El precio no puede ser negativo' } })} />
+                          {editErrors.price && <span className="error">{editErrors.price.message}</span>}
                         </div>
                         {perKgHint(editUnitType, editPriceBase, editPrice) && (
                           <div className="field field-full">
@@ -438,7 +482,8 @@ const Products = () => {
                         </div>
                         <div className="field">
                           <label htmlFor={`edit-cost-${product.id}`}>Costo<RequiredMark /></label>
-                          <input id={`edit-cost-${product.id}`} type="number" step="0.01" {...editForm.register('cost')} />
+                          <input id={`edit-cost-${product.id}`} type="number" step="0.01" {...editForm.register('cost', { required: 'El costo es obligatorio', min: { value: 0, message: 'El costo no puede ser negativo' } })} />
+                          {editErrors.cost && <span className="error">{editErrors.cost.message}</span>}
                         </div>
                         <div className="field">
                           <label htmlFor={`edit-vatRate-${product.id}`}>IVA</label>
@@ -475,6 +520,7 @@ const Products = () => {
                           <button type="submit">Guardar</button>
                           <button type="button" onClick={() => setEditingId(null)}>Cancelar</button>
                         </div>
+                        <FormMessage message={msg.at('edit')} onClose={msg.clear} />
                         <RequiredLegend />
                       </form>
                     </td>
@@ -496,6 +542,7 @@ const Products = () => {
                         <button onClick={() => setStockPanelId(stockPanelId === product.id ? null : product.id)}>
                           {stockPanelId === product.id ? 'Cerrar stock' : 'Stock'}
                         </button>
+                        <FormMessage message={msg.at(product.id)} onClose={msg.clear} />
                       </td>
                     </>
                   )}

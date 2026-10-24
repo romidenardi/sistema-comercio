@@ -4,6 +4,9 @@ import { useResource } from '../../hooks/useResource.js';
 import * as categoriesApi from '../../api/categories.api.js';
 import Spinner from '../../components/common/Spinner.jsx';
 import { RequiredMark, RequiredLegend } from '../../components/common/Required.jsx';
+import FormMessage from '../../components/common/FormMessage.jsx';
+import { useMessage } from '../../hooks/useMessage.js';
+import { applyServerFieldErrors } from '../../utils/serverErrors.js';
 
 const api = {
   getAll: categoriesApi.getCategories,
@@ -13,11 +16,13 @@ const api = {
 };
 
 const Categories = () => {
-  const { items: categories, loading, create, update, remove } = useResource(api);
+  const { items: categories, loading, loadError, create, update, remove } = useResource(api);
+  const msg = useMessage();
   const [editingId, setEditingId] = useState(null);
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm();
+  const { register, handleSubmit, reset, setError, formState: { errors } } = useForm();
   const editForm = useForm();
+  const { errors: editErrors } = editForm.formState;
 
   const topLevelCategories = categories.filter((c) => !c.parentId);
 
@@ -26,11 +31,17 @@ const Categories = () => {
       name: formData.name,
       parentId: formData.parentId || null,
     });
-    if (result.success) reset();
+    if (result.success) {
+      reset();
+      msg.success('Categoría creada', 'create');
+    } else if (!applyServerFieldErrors(result.error, setError, ['name'])) {
+      msg.error(result.message, 'create');
+    }
   };
 
   const startEdit = (category) => {
     setEditingId(category.id);
+    msg.clear();
     editForm.reset({ name: category.name, parentId: category.parentId || '' });
   };
 
@@ -39,11 +50,20 @@ const Categories = () => {
       name: formData.name,
       parentId: formData.parentId || null,
     });
-    if (result.success) setEditingId(null);
+    if (result.success) {
+      const savedId = editingId;
+      setEditingId(null);
+      msg.success('Cambios guardados', savedId);
+    } else if (!applyServerFieldErrors(result.error, editForm.setError, ['name'])) {
+      msg.error(result.message, 'edit');
+    }
   };
 
-  const onDelete = (id) => {
-    if (confirm('¿Eliminar esta categoría?')) remove(id);
+  const onDelete = async (id) => {
+    if (!confirm('¿Eliminar esta categoría?')) return;
+    const result = await remove(id);
+    if (result.success) msg.success('Categoría eliminada', 'list');
+    else msg.error(result.message, id);
   };
 
   if (loading) return <Spinner label="Cargando categorías..." />;
@@ -51,6 +71,7 @@ const Categories = () => {
   return (
     <div className="categories-page">
       <h1>Categorías</h1>
+      <FormMessage message={loadError ? { type: 'error', text: loadError } : null} />
 
       <form onSubmit={handleSubmit(onCreate)} className="category-form">
         <div className="field">
@@ -74,9 +95,11 @@ const Categories = () => {
         </div>
 
         <button type="submit">Agregar categoría</button>
+        <FormMessage message={msg.at('create')} onClose={msg.clear} />
         <RequiredLegend />
       </form>
 
+      <FormMessage message={msg.at('list')} />
       <div className="table-wrapper">
         <table>
           <thead>
@@ -94,7 +117,8 @@ const Categories = () => {
                       <form onSubmit={editForm.handleSubmit(onUpdate)} className="inline-edit-form">
                         <div className="field">
                           <label htmlFor={`edit-name-${category.id}`}>Nombre<RequiredMark /></label>
-                          <input id={`edit-name-${category.id}`} {...editForm.register('name', { required: true })} />
+                          <input id={`edit-name-${category.id}`} {...editForm.register('name', { required: 'El nombre es obligatorio' })} />
+                          {editErrors.name && <span className="error">{editErrors.name.message}</span>}
                         </div>
                         <div className="field">
                           <label htmlFor={`edit-parent-${category.id}`}>Categoría padre</label>
@@ -109,6 +133,7 @@ const Categories = () => {
                           <button type="submit">Guardar</button>
                           <button type="button" onClick={() => setEditingId(null)}>Cancelar</button>
                         </div>
+                        <FormMessage message={msg.at('edit')} onClose={msg.clear} />
                         <RequiredLegend />
                       </form>
                     </td>
@@ -122,6 +147,7 @@ const Categories = () => {
                         <button onClick={() => onDelete(category.id)}>Eliminar</button>
                       </>
                     )}
+                    <FormMessage message={msg.at(category.id)} onClose={msg.clear} />
                   </td>
                 </tr>
                 {category.subcategories?.map((sub) => (
@@ -131,7 +157,8 @@ const Categories = () => {
                         <form onSubmit={editForm.handleSubmit(onUpdate)} className="inline-edit-form">
                           <div className="field">
                             <label htmlFor={`edit-name-${sub.id}`}>Nombre<RequiredMark /></label>
-                            <input id={`edit-name-${sub.id}`} {...editForm.register('name', { required: true })} />
+                            <input id={`edit-name-${sub.id}`} {...editForm.register('name', { required: 'El nombre es obligatorio' })} />
+                            {editErrors.name && <span className="error">{editErrors.name.message}</span>}
                           </div>
                           <div className="field">
                             <label htmlFor={`edit-parent-${sub.id}`}>Categoría padre</label>
@@ -146,6 +173,7 @@ const Categories = () => {
                             <button type="submit">Guardar</button>
                             <button type="button" onClick={() => setEditingId(null)}>Cancelar</button>
                           </div>
+                          <FormMessage message={msg.at('edit')} onClose={msg.clear} />
                           <RequiredLegend />
                         </form>
                       </td>
@@ -161,6 +189,7 @@ const Categories = () => {
                           <button onClick={() => onDelete(sub.id)}>Eliminar</button>
                         </>
                       )}
+                      <FormMessage message={msg.at(sub.id)} onClose={msg.clear} />
                     </td>
                   </tr>
                 ))}

@@ -3,7 +3,9 @@ import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { getPurchases, createPurchase } from '../../api/purchases.api.js';
 import { getSuppliers, createSupplier } from '../../api/suppliers.api.js';
 import { getProducts, createProduct } from '../../api/products.api.js';
-import { useToast } from '../../context/ToastContext.jsx';
+import FormMessage from '../../components/common/FormMessage.jsx';
+import { useMessage } from '../../hooks/useMessage.js';
+import { serverMessage } from '../../utils/serverErrors.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import Spinner from '../../components/common/Spinner.jsx';
 import ScanBar from '../../components/common/ScanBar.jsx';
@@ -37,12 +39,12 @@ const Purchases = () => {
   const [suppliers, setSuppliers] = useState([]);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const { showToast } = useToast();
+  const msg = useMessage();
   const { role } = useAuth();
   const canManageData = role === 'admin' || role === 'editor';
 
   const {
-    register, control, handleSubmit, reset, watch, setValue, formState: { errors, isSubmitting },
+    register, control, handleSubmit, reset, watch, setValue, setError, formState: { errors, isSubmitting },
   } = useForm({
     defaultValues: emptyForm(),
   });
@@ -64,7 +66,7 @@ const Purchases = () => {
       setSuppliers(suppliersRes.data);
       setProducts(productsRes.data);
     } catch (err) {
-      showToast('No se pudo cargar la información', 'error');
+      msg.error('No se pudo cargar la información. Recargá la página.', 'page');
     } finally {
       setLoading(false);
     }
@@ -98,12 +100,12 @@ const Purchases = () => {
       } else {
         append({ ...emptyItem(), productId: product.id, unitCost: Number(product.cost) || 0 });
       }
-      showToast(`${product.name} agregado`);
+      msg.success(`${product.name} agregado`, 'scan');
       return;
     }
 
     if (!canManageData) {
-      showToast(`No hay ningún producto con el código ${code}`, 'error');
+      msg.error(`No hay ningún producto con el código ${code}`, 'scan');
       return;
     }
     if (!window.confirm(`El código ${code} no está registrado. ¿Crear un producto nuevo con ese código?`)) {
@@ -137,25 +139,32 @@ const Purchases = () => {
   };
 
   const submitPurchase = async (formData) => {
+    msg.clear();
     try {
+      // Datos del proveedor y de los productos nuevos: cada error va debajo de su campo
+      let missing = false;
       if (isNewSupplier && !formData.newSupplier.name) {
-        showToast('Completá el nombre del proveedor nuevo', 'error');
-        return;
+        setError('newSupplier.name', { type: 'manual', message: 'Cargá el nombre del proveedor' });
+        missing = true;
       }
 
-      for (const item of formData.items) {
-        if (item.productId === NEW_PRODUCT) {
-          const np = item.newProduct || {};
-          if (!np.internalCode || !np.name) {
-            showToast('Completá código interno y producto del producto nuevo', 'error');
-            return;
-          }
-          if (!(Number(np.price) > 0)) {
-            showToast('Cargá el precio de venta del producto nuevo', 'error');
-            return;
-          }
+      formData.items.forEach((item, i) => {
+        if (item.productId !== NEW_PRODUCT) return;
+        const np = item.newProduct || {};
+        if (!np.internalCode) {
+          setError(`items.${i}.newProduct.internalCode`, { type: 'manual', message: 'Cargá el código interno' });
+          missing = true;
         }
-      }
+        if (!np.name) {
+          setError(`items.${i}.newProduct.name`, { type: 'manual', message: 'Cargá el nombre del producto' });
+          missing = true;
+        }
+        if (!(Number(np.price) > 0)) {
+          setError(`items.${i}.newProduct.price`, { type: 'manual', message: 'Cargá el precio de venta' });
+          missing = true;
+        }
+      });
+      if (missing) return;
 
       let supplierId = formData.supplierId;
       if (isNewSupplier) {
@@ -209,11 +218,15 @@ const Purchases = () => {
       };
       await createPurchase(payload);
       requestIdRef.current = newRequestId();
-      showToast('Compra registrada, stock actualizado');
+      msg.success('Compra registrada, stock actualizado');
       reset(emptyForm());
       loadAll();
     } catch (err) {
-      showToast(err.response?.data?.message || 'Error al registrar la compra', 'error');
+      // "Artículo 2: ..." se muestra en ese renglón; el resto, junto al botón
+      const text = serverMessage(err, 'Error al registrar la compra');
+      const row = /^Artículo (\d+):\s*/.exec(text);
+      if (row) msg.error(text.slice(row[0].length), `row-${Number(row[1]) - 1}`);
+      else msg.error(text);
     }
   };
 
@@ -238,6 +251,7 @@ const Purchases = () => {
   return (
     <div className="purchases-page">
       <h1>Compras a proveedores</h1>
+      <FormMessage message={msg.at('page')} onClose={msg.clear} />
 
       <form onSubmit={handleSubmit(onSubmit)} className="purchase-form">
         <div className="field">
@@ -245,7 +259,7 @@ const Purchases = () => {
           <Controller
             name="supplierId"
             control={control}
-            rules={{ required: true }}
+            rules={{ required: 'Elegí un proveedor' }}
             render={({ field }) => (
               <SearchSelect
                 id="supplierId"
@@ -261,6 +275,7 @@ const Purchases = () => {
               />
             )}
           />
+          {errors.supplierId && <span className="error">{errors.supplierId.message}</span>}
         </div>
 
         {isNewSupplier && (
@@ -268,6 +283,7 @@ const Purchases = () => {
             <div className="field">
               <label htmlFor="newSupplierName">Nombre<RequiredMark /></label>
               <input id="newSupplierName" placeholder="Ej: Distribuidora Norte SRL" {...register('newSupplier.name')} />
+              {errors.newSupplier?.name && <span className="error">{errors.newSupplier?.name.message}</span>}
             </div>
             <div className="field">
               <label htmlFor="newSupplierCuit">CUIT</label>
@@ -290,6 +306,7 @@ const Purchases = () => {
         </div>
 
         <ScanBar onScan={handleScan} />
+        <FormMessage message={msg.at('scan')} onClose={msg.clear} />
 
         <div className="purchase-items">
           {fields.map((field, index) => {
@@ -308,7 +325,7 @@ const Purchases = () => {
                   <Controller
                     name={`items.${index}.productId`}
                     control={control}
-                    rules={{ required: true }}
+                    rules={{ required: 'Elegí un producto' }}
                     render={({ field }) => (
                       <SearchSelect
                         id={`item-product-${index}`}
@@ -324,6 +341,7 @@ const Purchases = () => {
                       />
                     )}
                   />
+                  {errors.items?.[index]?.productId && <span className="error">{errors.items?.[index]?.productId.message}</span>}
                 </div>
                 <div className="field">
                   <label htmlFor={`item-quantity-${index}`}>Cantidad<RequiredMark /></label>
@@ -334,8 +352,8 @@ const Purchases = () => {
                       step={rowQtyUnit === 'g' ? '1' : quantityStep(rowUnitType)}
                       placeholder={rowUnitType === 'weight' ? (rowQtyUnit === 'g' ? 'Ej: 500' : 'Ej: 10,500') : 'Ej: 10'}
                       {...register(`items.${index}.quantity`, {
-                        required: true,
-                        min: rowQtyUnit === 'g' ? 1 : quantityMin(rowUnitType),
+                        required: 'Cargá la cantidad',
+                        min: { value: rowQtyUnit === 'g' ? 1 : quantityMin(rowUnitType), message: 'La cantidad tiene que ser mayor a 0' },
                       })}
                     />
                     {rowUnitType === 'weight' && (
@@ -345,6 +363,7 @@ const Purchases = () => {
                       </select>
                     )}
                   </div>
+                  {errors.items?.[index]?.quantity && <span className="error">{errors.items?.[index]?.quantity.message}</span>}
                 </div>
                 <div className="field">
                   <label htmlFor={`item-unitCost-${index}`}>
@@ -355,8 +374,12 @@ const Purchases = () => {
                     type="number"
                     step="0.01"
                     placeholder="Ej: 850"
-                    {...register(`items.${index}.unitCost`, { required: true, min: 0 })}
+                    {...register(`items.${index}.unitCost`, {
+                      required: 'Cargá el costo',
+                      min: { value: 0, message: 'El costo no puede ser negativo' },
+                    })}
                   />
+                  {errors.items?.[index]?.unitCost && <span className="error">{errors.items?.[index]?.unitCost.message}</span>}
                 </div>
                 <div className="field item-remove-field">
                   <label aria-hidden="true">&nbsp;</label>
@@ -387,6 +410,7 @@ const Purchases = () => {
                         placeholder="Ej: P001"
                         {...register(`items.${index}.newProduct.internalCode`)}
                       />
+                      {errors.items?.[index]?.newProduct?.internalCode && <span className="error">{errors.items?.[index]?.newProduct?.internalCode.message}</span>}
                     </div>
                     <div className="field">
                       <label htmlFor={`new-product-barcode-${index}`}>Código de barras</label>
@@ -402,6 +426,7 @@ const Purchases = () => {
                         placeholder="Ej: Cerveza IPA 500ml"
                         {...register(`items.${index}.newProduct.name`)}
                       />
+                      {errors.items?.[index]?.newProduct?.name && <span className="error">{errors.items?.[index]?.newProduct?.name.message}</span>}
                     </div>
                     <div className="field">
                       <label htmlFor={`new-product-price-${index}`}>{rowUnitType === 'weight' ? 'Precio de venta por kg' : 'Precio de venta'}<RequiredMark /></label>
@@ -412,6 +437,7 @@ const Purchases = () => {
                         placeholder="Ej: 1500"
                         {...register(`items.${index}.newProduct.price`)}
                       />
+                      {errors.items?.[index]?.newProduct?.price && <span className="error">{errors.items?.[index]?.newProduct?.price.message}</span>}
                     </div>
                     <div className="field">
                       <label htmlFor={`new-product-vat-${index}`}>IVA</label>
@@ -447,6 +473,12 @@ const Purchases = () => {
                     </div>
                   </div>
                 )}
+
+                {msg.at(`row-${index}`) && (
+                  <div className="field field-full">
+                    <FormMessage message={msg.at(`row-${index}`)} onClose={msg.clear} />
+                  </div>
+                )}
               </div>
             );
           })}
@@ -461,6 +493,7 @@ const Purchases = () => {
         <button type="submit" disabled={isSubmitting}>
           {isSubmitting ? 'Registrando compra…' : 'Registrar compra'}
         </button>
+        <FormMessage message={msg.at()} onClose={msg.clear} />
         <RequiredLegend />
       </form>
 

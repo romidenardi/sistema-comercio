@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { createCombo, updateCombo, deleteCombo } from '../../api/combos.api.js';
-import { useToast } from '../../context/ToastContext.jsx';
+import FormMessage from '../../components/common/FormMessage.jsx';
+import { useMessage } from '../../hooks/useMessage.js';
+import { serverMessage } from '../../utils/serverErrors.js';
 import SearchSelect from '../../components/common/SearchSelect.jsx';
 import SearchInput from '../../components/common/SearchInput.jsx';
 import { matchesSearch } from '../../utils/search.js';
@@ -32,6 +34,7 @@ const ComboForm = ({
     register, control, handleSubmit, reset, watch, formState: { errors },
   } = useForm({ defaultValues });
   const { fields, append, remove } = useFieldArray({ control, name: 'components' });
+  const formMsg = useMessage();
   const watchedComponents = watch('components');
   const watchedSpecial = watch('specialPrice');
 
@@ -70,8 +73,13 @@ const ComboForm = ({
     };
     if (showActive) payload.active = formData.active === 'true';
 
-    const ok = await onSubmit(payload);
-    if (ok && !onCancel) reset(emptyForm());
+    const result = await onSubmit(payload);
+    if (!result.success) {
+      formMsg.error(result.message);
+    } else if (!onCancel) {
+      reset(emptyForm());
+      formMsg.success('Combo creado');
+    }
   };
 
   return (
@@ -213,13 +221,14 @@ const ComboForm = ({
         <button type="submit">{submitLabel}</button>
         {onCancel && <button type="button" onClick={onCancel}>Cancelar</button>}
       </div>
+      <FormMessage message={formMsg.message} onClose={formMsg.clear} />
       <RequiredLegend />
     </form>
   );
 };
 
 const Combos = ({ products, categories, onChanged }) => {
-  const { showToast } = useToast();
+  const msg = useMessage();
   const [editingId, setEditingId] = useState(null);
   const [search, setSearch] = useState('');
 
@@ -229,35 +238,34 @@ const Combos = ({ products, categories, onChanged }) => {
 
   const categoryName = (categoryId) => categories.find((c) => c.id === categoryId)?.name || '—';
 
-  const save = (action, successMessage, fallbackMessage) => async (payload) => {
+  // Devuelve { success } o { success: false, message }; cada formulario o fila muestra su aviso
+  const run = async (action, fallbackMessage) => {
     try {
-      await action(payload);
-      showToast(successMessage);
+      await action();
       await onChanged();
-      return true;
+      return { success: true };
     } catch (err) {
-      showToast(err.response?.data?.message || fallbackMessage, 'error');
-      return false;
+      return { success: false, message: serverMessage(err, fallbackMessage) };
     }
   };
 
-  const onCreate = save(createCombo, 'Combo creado', 'No se pudo crear el combo');
+  const onCreate = (payload) => run(() => createCombo(payload), 'No se pudo crear el combo');
 
   const onUpdate = async (payload) => {
-    const ok = await save((data) => updateCombo(editingId, data), 'Combo actualizado', 'No se pudo guardar el combo')(payload);
-    if (ok) setEditingId(null);
-    return ok;
+    const comboId = editingId;
+    const result = await run(() => updateCombo(comboId, payload), 'No se pudo guardar el combo');
+    if (result.success) {
+      setEditingId(null);
+      msg.success('Cambios guardados', comboId);
+    }
+    return result;
   };
 
   const onDelete = async (combo) => {
     if (!confirm(`¿Eliminar el combo "${combo.name}"? Los productos que lo forman no se tocan.`)) return;
-    try {
-      await deleteCombo(combo.id);
-      showToast('Combo eliminado');
-      await onChanged();
-    } catch (err) {
-      showToast(err.response?.data?.message || 'No se pudo eliminar el combo', 'error');
-    }
+    const result = await run(() => deleteCombo(combo.id), 'No se pudo eliminar el combo');
+    if (result.success) msg.success('Combo eliminado', 'list');
+    else msg.error(result.message, combo.id);
   };
 
   const editDefaults = (combo) => ({
@@ -301,6 +309,7 @@ const Combos = ({ products, categories, onChanged }) => {
         onChange={setSearch}
       />
 
+      <FormMessage message={msg.at('list')} />
       <div className="table-wrapper">
         <table>
           <thead>
@@ -358,6 +367,7 @@ const Combos = ({ products, categories, onChanged }) => {
                     <td data-label="Acciones">
                       <button type="button" onClick={() => setEditingId(combo.id)}>Editar</button>
                       <button type="button" onClick={() => onDelete(combo)}>Eliminar</button>
+                      <FormMessage message={msg.at(combo.id)} onClose={msg.clear} />
                     </td>
                   </>
                 )}

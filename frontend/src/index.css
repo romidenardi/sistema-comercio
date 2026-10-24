@@ -1484,3 +1484,57 @@ button.report-export:disabled {
 .invite-mail-warn {
   color: var(--color-warning);
 }
+
+/* ---- Avisos en el lugar de la acción (components/common/FormMessage.jsx) ---- */
+.form-message {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  margin-top: 8px;
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.form-message-error {
+  color: var(--color-danger);
+  background: var(--color-danger-bg);
+  border: 1px solid var(--color-danger);
+}
+
+.form-message-success {
+  color: var(--color-success);
+  background: var(--color-success-bg);
+  border: 1px solid var(--color-success);
+}
+
+.form-message span {
+  flex: 1;
+}
+
+.form-message .form-message-close {
+  flex: none;
+  margin: 0;
+  padding: 0 4px;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: none;
+}
+
+.form-message .form-message-close:hover {
+  background: transparent;
+  opacity: 0.7;
+}
+
+/* Dentro de una celda de tabla (aviso de la fila) */
+td .form-message {
+  margin-top: 6px;
+  min-width: 220px;
+}

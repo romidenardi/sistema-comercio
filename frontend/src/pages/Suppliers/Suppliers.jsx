@@ -6,6 +6,9 @@ import Spinner from '../../components/common/Spinner.jsx';
 import SearchInput from '../../components/common/SearchInput.jsx';
 import { matchesSearch } from '../../utils/search.js';
 import { RequiredMark, RequiredLegend } from '../../components/common/Required.jsx';
+import FormMessage from '../../components/common/FormMessage.jsx';
+import { useMessage } from '../../hooks/useMessage.js';
+import { applyServerFieldErrors } from '../../utils/serverErrors.js';
 
 const api = {
   getAll: suppliersApi.getSuppliers,
@@ -15,20 +18,30 @@ const api = {
 };
 
 const Suppliers = () => {
-  const { items: suppliers, loading, create, update, remove } = useResource(api);
+  const { items: suppliers, loading, loadError, create, update, remove } = useResource(api);
+  const msg = useMessage();
+  // Campos que muestran su error debajo
+  const SUPPLIER_FIELDS = ['name', 'email'];
   const [editingId, setEditingId] = useState(null);
   const [search, setSearch] = useState('');
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm();
+  const { register, handleSubmit, reset, setError, formState: { errors } } = useForm();
   const editForm = useForm();
+  const { errors: editErrors } = editForm.formState;
 
   const onCreate = async (formData) => {
     const result = await create(formData);
-    if (result.success) reset();
+    if (result.success) {
+      reset();
+      msg.success('Proveedor agregado', 'create');
+    } else if (!applyServerFieldErrors(result.error, setError, SUPPLIER_FIELDS)) {
+      msg.error(result.message, 'create');
+    }
   };
 
   const startEdit = (supplier) => {
     setEditingId(supplier.id);
+    msg.clear();
     editForm.reset({
       name: supplier.name || '',
       cuit: supplier.cuit || '',
@@ -44,11 +57,20 @@ const Suppliers = () => {
 
   const onUpdate = async (formData) => {
     const result = await update(editingId, formData);
-    if (result.success) setEditingId(null);
+    if (result.success) {
+      const savedId = editingId;
+      setEditingId(null);
+      msg.success('Cambios guardados', savedId);
+    } else if (!applyServerFieldErrors(result.error, editForm.setError, SUPPLIER_FIELDS)) {
+      msg.error(result.message, 'edit');
+    }
   };
 
-  const onDelete = (id) => {
-    if (confirm('¿Eliminar este proveedor?')) remove(id);
+  const onDelete = async (id) => {
+    if (!confirm('¿Eliminar este proveedor?')) return;
+    const result = await remove(id);
+    if (result.success) msg.success('Proveedor eliminado', 'list');
+    else msg.error(result.message, id);
   };
 
   // La fila que se está editando sigue visible aunque el filtro no la incluya
@@ -61,6 +83,7 @@ const Suppliers = () => {
   return (
     <div className="suppliers-page">
       <h1>Proveedores</h1>
+      <FormMessage message={loadError ? { type: 'error', text: loadError } : null} />
 
       <form onSubmit={handleSubmit(onCreate)} className="supplier-form">
         <div className="field">
@@ -87,6 +110,7 @@ const Suppliers = () => {
         <div className="field">
           <label htmlFor="email">Email</label>
           <input id="email" type="email" placeholder="Ej: ventas@proveedor.com" {...register('email')} />
+          {errors.email && <span className="error">{errors.email.message}</span>}
         </div>
 
         <div className="field">
@@ -105,6 +129,7 @@ const Suppliers = () => {
         </div>
 
         <button type="submit">Agregar proveedor</button>
+        <FormMessage message={msg.at('create')} onClose={msg.clear} />
         <RequiredLegend />
       </form>
 
@@ -116,6 +141,7 @@ const Suppliers = () => {
         onChange={setSearch}
       />
 
+      <FormMessage message={msg.at('list')} />
       <div className="table-wrapper">
         <table>
           <thead>
@@ -142,7 +168,8 @@ const Suppliers = () => {
                     <form onSubmit={editForm.handleSubmit(onUpdate)} className="inline-edit-form">
                       <div className="field">
                         <label htmlFor={`edit-name-${supplier.id}`}>Nombre<RequiredMark /></label>
-                        <input id={`edit-name-${supplier.id}`} {...editForm.register('name')} />
+                        <input id={`edit-name-${supplier.id}`} {...editForm.register('name', { required: 'El nombre es obligatorio' })} />
+                        {editErrors.name && <span className="error">{editErrors.name.message}</span>}
                       </div>
                       <div className="field">
                         <label htmlFor={`edit-cuit-${supplier.id}`}>CUIT</label>
@@ -159,6 +186,7 @@ const Suppliers = () => {
                       <div className="field">
                         <label htmlFor={`edit-email-${supplier.id}`}>Email</label>
                         <input id={`edit-email-${supplier.id}`} type="email" {...editForm.register('email')} />
+                        {editErrors.email && <span className="error">{editErrors.email.message}</span>}
                       </div>
                       <div className="field">
                         <label htmlFor={`edit-address-${supplier.id}`}>Dirección</label>
@@ -183,6 +211,7 @@ const Suppliers = () => {
                         <button type="submit">Guardar</button>
                         <button type="button" onClick={() => setEditingId(null)}>Cancelar</button>
                       </div>
+                      <FormMessage message={msg.at('edit')} onClose={msg.clear} />
                       <RequiredLegend />
                     </form>
                   </td>
@@ -198,6 +227,7 @@ const Suppliers = () => {
                     <td data-label="Acciones">
                       <button onClick={() => startEdit(supplier)}>Editar</button>
                       <button onClick={() => onDelete(supplier.id)}>Eliminar</button>
+                      <FormMessage message={msg.at(supplier.id)} onClose={msg.clear} />
                     </td>
                   </>
                 )}

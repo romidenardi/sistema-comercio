@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { getScaleConfig, updateScaleConfig } from '../../api/scale.api.js';
-import { useToast } from '../../context/ToastContext.jsx';
+import FormMessage from '../../components/common/FormMessage.jsx';
+import { useMessage } from '../../hooks/useMessage.js';
+import { serverMessage } from '../../utils/serverErrors.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import Spinner from '../../components/common/Spinner.jsx';
 import { DEFAULT_SCALE_CONFIG, resolveScaleConfig, parseScaleCode, lineFromLabel } from '../../utils/scale.js';
@@ -9,7 +11,7 @@ import { formatQuantity } from '../../utils/quantity.js';
 const money = (value) => `$${(Number(value) || 0).toFixed(2)}`;
 
 const ScaleSettings = ({ products }) => {
-  const { showToast } = useToast();
+  const msg = useMessage();
   const { role } = useAuth();
   const canEdit = role === 'admin' || role === 'editor';
 
@@ -21,7 +23,7 @@ const ScaleSettings = ({ products }) => {
   useEffect(() => {
     getScaleConfig()
       .then(({ data }) => setForm(resolveScaleConfig(data)))
-      .catch(() => showToast('No se pudo cargar la configuración de la balanza', 'error'))
+      .catch(() => msg.error('No se pudo cargar la configuración de la balanza. Recargá la página.'))
       .finally(() => setLoading(false));
   }, []);
 
@@ -53,9 +55,9 @@ const ScaleSettings = ({ products }) => {
         decimals: Number(form.decimals),
       });
       setForm(resolveScaleConfig(data));
-      showToast('Configuración de la balanza guardada');
+      msg.success('Configuración de la balanza guardada');
     } catch (err) {
-      showToast(err.response?.data?.message || 'No se pudo guardar la configuración', 'error');
+      msg.error(serverMessage(err, 'No se pudo guardar la configuración'));
     } finally {
       setSaving(false);
     }
@@ -165,6 +167,7 @@ const ScaleSettings = ({ products }) => {
             <button type="button" onClick={useSystelDefaults}>Usar valores de Systel</button>
           </div>
         )}
+        <FormMessage message={msg.message} onClose={msg.clear} />
         {!canEdit && <p className="report-note">Solo un administrador o editor puede cambiar esta configuración.</p>}
       </form>
 

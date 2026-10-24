@@ -5,6 +5,9 @@ import { useAuth } from '../../context/AuthContext.jsx';
 import * as usersApi from '../../api/users.api.js';
 import Spinner from '../../components/common/Spinner.jsx';
 import { validatePassword, validateOptionalPassword } from '../../utils/password.js';
+import FormMessage from '../../components/common/FormMessage.jsx';
+import { useMessage } from '../../hooks/useMessage.js';
+import { applyServerFieldErrors, fieldFromMessage } from '../../utils/serverErrors.js';
 import { RequiredMark, RequiredLegend } from '../../components/common/Required.jsx';
 
 const api = {
@@ -58,7 +61,8 @@ const Notice = ({ notice, onClose }) => {
 };
 
 const UsersContent = ({ notice, setNotice, reload }) => {
-  const { items: users, loading, update, remove } = useResource(api);
+  const { items: users, loading, loadError, update, remove } = useResource(api);
+  const msg = useMessage();
   const { user: currentUser } = useAuth();
   const [editingId, setEditingId] = useState(null);
 
@@ -82,12 +86,13 @@ const UsersContent = ({ notice, setNotice, reload }) => {
       };
       const { data } = await usersApi.createUser(payload);
       reset(DEFAULT_CREATE);
-      setNotice(buildNotice(data.mail, formData.email, 'Usuario creado.'));
+      setNotice({ ...buildNotice(data.mail, formData.email, 'Usuario creado.'), where: 'create' });
       reload();
     } catch (err) {
       setNotice({
         type: 'error',
         text: err.response?.data?.message || 'No se pudo crear el usuario',
+        where: 'create',
       });
     }
   };
@@ -101,17 +106,19 @@ const UsersContent = ({ notice, setNotice, reload }) => {
     setNotice(null);
     try {
       const { data } = await usersApi.sendAccessLink(user.id);
-      setNotice(buildNotice(data.mail, data.email, 'Listo.'));
+      setNotice({ ...buildNotice(data.mail, data.email, 'Listo.'), where: user.id });
     } catch (err) {
       setNotice({
         type: 'error',
         text: err.response?.data?.message || 'No se pudo generar el link',
+        where: user.id,
       });
     }
   };
 
   const startEdit = (user) => {
     setEditingId(user.id);
+    msg.clear();
     editForm.reset({
       name: user.name,
       email: user.email,
@@ -132,12 +139,26 @@ const UsersContent = ({ notice, setNotice, reload }) => {
       payload.password = formData.password;
     }
     const result = await update(editingId, payload);
-    if (result.success) setEditingId(null);
+    if (result.success) {
+      const savedId = editingId;
+      setEditingId(null);
+      msg.success('Cambios guardados', savedId);
+      return;
+    }
+    if (applyServerFieldErrors(result.error, editForm.setError, ['name', 'email', 'password'])) return;
+    const field = fieldFromMessage(result.message, { email: /email/i, password: /contraseña/i });
+    if (field) editForm.setError(field, { type: 'server', message: result.message });
+    else msg.error(result.message, 'edit');
   };
 
-  const onDelete = (id) => {
-    if (confirm('¿Eliminar este usuario? La acción no se puede deshacer.')) remove(id);
+  const onDelete = async (id) => {
+    if (!confirm('¿Eliminar este usuario? La acción no se puede deshacer.')) return;
+    const result = await remove(id);
+    if (result.success) msg.success('Usuario eliminado', 'list');
+    else msg.error(result.message, id);
   };
+
+  const noticeAt = (where) => (notice && notice.where === where ? notice : null);
 
   const roleLabel = (role) => ROLES.find((r) => r.value === role)?.label.split(' (')[0] || role;
 
@@ -147,7 +168,7 @@ const UsersContent = ({ notice, setNotice, reload }) => {
     <div className="users-page">
       <h1>Usuarios</h1>
 
-      <Notice notice={notice} onClose={() => setNotice(null)} />
+      <FormMessage message={loadError ? { type: 'error', text: loadError } : null} />
 
       <form onSubmit={handleSubmit(onCreate)} className="user-form">
         <div className="field">
@@ -208,9 +229,11 @@ const UsersContent = ({ notice, setNotice, reload }) => {
         <button type="submit">
           {mode === 'invite' ? 'Crear y enviar invitación' : 'Agregar usuario'}
         </button>
+        <Notice notice={noticeAt('create')} onClose={() => setNotice(null)} />
         <RequiredLegend />
       </form>
 
+      <FormMessage message={msg.at('list')} />
       <div className="table-wrapper">
         <table>
           <thead>
@@ -237,11 +260,13 @@ const UsersContent = ({ notice, setNotice, reload }) => {
                       <form onSubmit={editForm.handleSubmit(onUpdate)} className="inline-edit-form">
                         <div className="field">
                           <label htmlFor={`edit-name-${user.id}`}>Nombre<RequiredMark /></label>
-                          <input id={`edit-name-${user.id}`} {...editForm.register('name', { required: true })} />
+                          <input id={`edit-name-${user.id}`} {...editForm.register('name', { required: 'El nombre es obligatorio' })} />
+                          {editErrors.name && <span className="error">{editErrors.name.message}</span>}
                         </div>
                         <div className="field">
                           <label htmlFor={`edit-email-${user.id}`}>Email<RequiredMark /></label>
-                          <input id={`edit-email-${user.id}`} type="email" {...editForm.register('email', { required: true })} />
+                          <input id={`edit-email-${user.id}`} type="email" {...editForm.register('email', { required: 'El email es obligatorio' })} />
+                          {editErrors.email && <span className="error">{editErrors.email.message}</span>}
                         </div>
                         <div className="field">
                           <label htmlFor={`edit-password-${user.id}`}>Nueva contraseña (opcional)</label>
@@ -275,6 +300,7 @@ const UsersContent = ({ notice, setNotice, reload }) => {
                           <button type="submit">Guardar</button>
                           <button type="button" onClick={() => setEditingId(null)}>Cancelar</button>
                         </div>
+                        <FormMessage message={msg.at('edit')} onClose={msg.clear} />
                         {isSelf && (
                           <span className="error">No podés cambiar tu propio rol ni desactivarte.</span>
                         )}
@@ -297,6 +323,8 @@ const UsersContent = ({ notice, setNotice, reload }) => {
                         {!isSelf && (
                           <button onClick={() => onDelete(user.id)}>Eliminar</button>
                         )}
+                        <Notice notice={noticeAt(user.id)} onClose={() => setNotice(null)} />
+                        <FormMessage message={msg.at(user.id)} onClose={msg.clear} />
                       </td>
                     </>
                   )}

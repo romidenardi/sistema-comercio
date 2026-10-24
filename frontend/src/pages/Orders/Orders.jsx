@@ -7,7 +7,9 @@ import { getPayments } from '../../api/payments.api.js';
 import { getProducts, createProduct } from '../../api/products.api.js';
 import { getScaleConfig } from '../../api/scale.api.js';
 import { newRequestId } from '../../utils/requestId.js';
-import { useToast } from '../../context/ToastContext.jsx';
+import FormMessage from '../../components/common/FormMessage.jsx';
+import { useMessage } from '../../hooks/useMessage.js';
+import { serverMessage } from '../../utils/serverErrors.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import Spinner from '../../components/common/Spinner.jsx';
 import ScanBar from '../../components/common/ScanBar.jsx';
@@ -42,12 +44,12 @@ const Orders = () => {
   const [scaleConfig, setScaleConfig] = useState(resolveScaleConfig(null));
   const [loading, setLoading] = useState(true);
   const [cancellingId, setCancellingId] = useState(null);
-  const { showToast } = useToast();
+  const msg = useMessage();
   const { role } = useAuth();
   const canManageData = role === 'admin' || role === 'editor';
 
   const {
-    register, control, handleSubmit, reset, watch, setValue, formState: { errors, isSubmitting },
+    register, control, handleSubmit, reset, watch, setValue, setError, formState: { errors, isSubmitting },
   } = useForm({
     defaultValues: {
       customerId: '',
@@ -87,7 +89,7 @@ const Orders = () => {
       setPayments(paymentsRes.data);
       setProducts(productsRes.data);
     } catch (err) {
-      showToast('No se pudo cargar la información', 'error');
+      msg.error('No se pudo cargar la información. Recargá la página.', 'page');
     } finally {
       setLoading(false);
     }
@@ -177,13 +179,13 @@ const Orders = () => {
   const handleScaleLabel = (label) => {
     const product = products.find((p) => !p.isCombo && p.scalePlu === label.plu);
     if (!product) {
-      showToast(`No hay ningún producto con el PLU ${label.plu}. Cargalo en Productos → campo "PLU de balanza".`, 'error');
+      msg.error(`No hay ningún producto con el PLU ${label.plu}. Cargalo en Productos → campo "PLU de balanza".`, 'scan');
       return;
     }
 
     const line = lineFromLabel(label, product);
     if (line.noPrice || !(line.quantity > 0)) {
-      showToast(`${product.name} no tiene precio cargado: no se puede calcular la cantidad`, 'error');
+      msg.error(`${product.name} no tiene precio cargado: no se puede calcular la cantidad`, 'scan');
       return;
     }
 
@@ -202,12 +204,14 @@ const Orders = () => {
       append({ ...emptyItem(), productId: product.id, unitPrice: Number(product.price), quantity: line.quantity });
     }
 
-    showToast(`${product.name}: ${formatQuantity(line.quantity, 'weight')} agregado`);
+    const added = `${product.name}: ${formatQuantity(line.quantity, 'weight')} agregado.`;
     if (line.priceMismatch) {
-      showToast(
-        `El importe de la etiqueta ($${label.value.toFixed(2)}) no coincide con el precio de ${product.name} en el sistema. Revisá que sean iguales.`,
-        'error'
+      msg.error(
+        `${added} Ojo: el importe de la etiqueta ($${label.value.toFixed(2)}) no coincide con el precio de ${product.name} en el sistema. Revisá que sean iguales.`,
+        'scan'
       );
+    } else {
+      msg.success(added, 'scan');
     }
   };
 
@@ -237,12 +241,12 @@ const Orders = () => {
       } else {
         append({ ...emptyItem(), productId: product.id, unitPrice: Number(product.price) });
       }
-      showToast(`${product.name} agregado`);
+      msg.success(`${product.name} agregado`, 'scan');
       return;
     }
 
     if (!canManageData) {
-      showToast(`No hay ningún producto con el código ${code}`, 'error');
+      msg.error(`No hay ningún producto con el código ${code}`, 'scan');
       return;
     }
     if (!window.confirm(`El código ${code} no está registrado. ¿Crear un producto nuevo con ese código?`)) {
@@ -276,33 +280,48 @@ const Orders = () => {
   };
 
   const submitOrder = async (formData) => {
+    msg.clear();
     if (discountExceedsTotal) {
-      showToast('El descuento no puede ser mayor al total del remito', 'error');
+      msg.error('El descuento no puede ser mayor al total del remito');
       return;
     }
 
     try {
+      // Datos del cliente y de los productos nuevos: cada error va debajo de su campo
+      let missing = false;
       if (isNewCustomer) {
         const { businessName, firstName, fiscalCondition } = formData.newCustomer;
-        if (!fiscalCondition || (!businessName && !firstName)) {
-          showToast('Completá los datos del cliente nuevo', 'error');
-          return;
+        if (!businessName && !firstName) {
+          setError('newCustomer.firstName', { type: 'manual', message: 'Completá el nombre o la razón social' });
+          missing = true;
+        }
+        if (!fiscalCondition) {
+          setError('newCustomer.fiscalCondition', { type: 'manual', message: 'Elegí la condición fiscal' });
+          missing = true;
         }
       }
 
-      for (const item of formData.items) {
-        if (item.productId === NEW_PRODUCT) {
-          const np = item.newProduct || {};
-          if (!np.internalCode || !np.name || np.cost === '' || np.cost === undefined) {
-            showToast('Completá código interno, producto y costo del producto nuevo', 'error');
-            return;
-          }
-          if (!(Number(item.unitPrice) > 0)) {
-            showToast('Cargá el precio unitario del producto nuevo', 'error');
-            return;
-          }
+      formData.items.forEach((item, i) => {
+        if (item.productId !== NEW_PRODUCT) return;
+        const np = item.newProduct || {};
+        if (!np.internalCode) {
+          setError(`items.${i}.newProduct.internalCode`, { type: 'manual', message: 'Cargá el código interno' });
+          missing = true;
         }
-      }
+        if (!np.name) {
+          setError(`items.${i}.newProduct.name`, { type: 'manual', message: 'Cargá el nombre del producto' });
+          missing = true;
+        }
+        if (np.cost === '' || np.cost === undefined) {
+          setError(`items.${i}.newProduct.cost`, { type: 'manual', message: 'Cargá el costo' });
+          missing = true;
+        }
+        if (!(Number(item.unitPrice) > 0)) {
+          setError(`items.${i}.unitPrice`, { type: 'manual', message: 'Cargá el precio del producto nuevo' });
+          missing = true;
+        }
+      });
+      if (missing) return;
 
       let customerId = formData.customerId;
       if (isNewCustomer) {
@@ -364,7 +383,7 @@ const Orders = () => {
 
       await createOrder(payload);
       requestIdRef.current = newRequestId();
-      showToast('Remito generado, stock actualizado');
+      msg.success('Remito generado, stock actualizado');
       reset({
         customerId: '',
         paymentId: '',
@@ -377,7 +396,11 @@ const Orders = () => {
       });
       loadAll();
     } catch (err) {
-      showToast(err.response?.data?.message || 'Error al generar el remito', 'error');
+      // "Artículo 2: ..." se muestra en ese renglón; el resto, junto al botón
+      const text = serverMessage(err, 'Error al generar el remito');
+      const row = /^Artículo (\d+):\s*/.exec(text);
+      if (row) msg.error(text.slice(row[0].length), `row-${Number(row[1]) - 1}`);
+      else msg.error(text);
     }
   };
 
@@ -409,10 +432,10 @@ const Orders = () => {
     setCancellingId(order.id);
     try {
       await cancelOrder(order.id, reason);
-      showToast('Remito anulado, stock devuelto');
-      loadAll();
+      await loadAll();
+      msg.success('Remito anulado, stock devuelto', order.id);
     } catch (err) {
-      showToast(err.response?.data?.message || 'No se pudo anular el remito', 'error');
+      msg.error(serverMessage(err, 'No se pudo anular el remito'), order.id);
     } finally {
       setCancellingId(null);
     }
@@ -423,6 +446,7 @@ const Orders = () => {
   return (
     <div className="orders-page">
       <h1>Remitos / Pedidos</h1>
+      <FormMessage message={msg.at('page')} onClose={msg.clear} />
 
       <form onSubmit={handleSubmit(onSubmit)} className="order-form">
         <div className="field">
@@ -430,7 +454,7 @@ const Orders = () => {
           <Controller
             name="customerId"
             control={control}
-            rules={{ required: true }}
+            rules={{ required: 'Elegí un cliente' }}
             render={({ field }) => (
               <SearchSelect
                 id="customerId"
@@ -446,6 +470,7 @@ const Orders = () => {
               />
             )}
           />
+          {errors.customerId && <span className="error">{errors.customerId.message}</span>}
         </div>
 
         {isNewCustomer && (
@@ -457,6 +482,7 @@ const Orders = () => {
             <div className="field">
               <label htmlFor="newCustomerFirstName">Nombre</label>
               <input id="newCustomerFirstName" placeholder="Ej: Juan" {...register('newCustomer.firstName')} />
+              {errors.newCustomer?.firstName && <span className="error">{errors.newCustomer?.firstName.message}</span>}
             </div>
             <div className="field">
               <label htmlFor="newCustomerLastName">Apellido</label>
@@ -470,18 +496,20 @@ const Orders = () => {
                   <option key={fc} value={fc}>{fc}</option>
                 ))}
               </select>
+              {errors.newCustomer?.fiscalCondition && <span className="error">{errors.newCustomer?.fiscalCondition.message}</span>}
             </div>
           </div>
         )}
 
         <div className="field">
           <label htmlFor="paymentId">Forma de pago<RequiredMark /></label>
-          <select id="paymentId" {...register('paymentId', { required: true })}>
+          <select id="paymentId" {...register('paymentId', { required: 'Elegí la forma de pago' })}>
             <option value="">Forma de pago...</option>
             {payments.filter((p) => p.active).map((p) => (
               <option key={p.id} value={p.id}>{p.name}</option>
             ))}
           </select>
+          {errors.paymentId && <span className="error">{errors.paymentId.message}</span>}
         </div>
 
         {availablePlans.length > 0 && (
@@ -530,6 +558,7 @@ const Orders = () => {
         </div>
 
         <ScanBar onScan={handleScan} />
+        <FormMessage message={msg.at('scan')} onClose={msg.clear} />
 
         <div className="purchase-items">
           {fields.map((field, index) => {
@@ -551,7 +580,7 @@ const Orders = () => {
                   <Controller
                     name={`items.${index}.productId`}
                     control={control}
-                    rules={{ required: true }}
+                    rules={{ required: 'Elegí un producto' }}
                     render={({ field: productField }) => (
                       <SearchSelect
                         id={`order-item-product-${index}`}
@@ -570,6 +599,7 @@ const Orders = () => {
                       />
                     )}
                   />
+                  {errors.items?.[index]?.productId && <span className="error">{errors.items?.[index]?.productId.message}</span>}
                 </div>
                 <div className="field">
                   <label htmlFor={`order-item-quantity-${index}`}>Cantidad<RequiredMark /></label>
@@ -580,8 +610,8 @@ const Orders = () => {
                       step={rowQtyUnit === 'g' ? '1' : quantityStep(rowUnitType)}
                       placeholder={rowUnitType === 'weight' ? (rowQtyUnit === 'g' ? 'Ej: 250' : 'Ej: 1,250') : 'Ej: 2'}
                       {...register(`items.${index}.quantity`, {
-                        required: true,
-                        min: rowQtyUnit === 'g' ? 1 : quantityMin(rowUnitType),
+                        required: 'Cargá la cantidad',
+                        min: { value: rowQtyUnit === 'g' ? 1 : quantityMin(rowUnitType), message: 'La cantidad tiene que ser mayor a 0' },
                       })}
                     />
                     {rowUnitType === 'weight' && (
@@ -591,6 +621,7 @@ const Orders = () => {
                       </select>
                     )}
                   </div>
+                  {errors.items?.[index]?.quantity && <span className="error">{errors.items?.[index]?.quantity.message}</span>}
                 </div>
                 <div className="field">
                   <label htmlFor={`order-item-price-${index}`}>
@@ -601,8 +632,12 @@ const Orders = () => {
                     type="number"
                     step="0.01"
                     placeholder="Ej: 1500"
-                    {...register(`items.${index}.unitPrice`, { required: true, min: 0 })}
+                    {...register(`items.${index}.unitPrice`, {
+                      required: 'Cargá el precio',
+                      min: { value: 0, message: 'El precio no puede ser negativo' },
+                    })}
                   />
+                  {errors.items?.[index]?.unitPrice && <span className="error">{errors.items?.[index]?.unitPrice.message}</span>}
                 </div>
                 <div className="field item-remove-field">
                   <label aria-hidden="true">&nbsp;</label>
@@ -633,6 +668,7 @@ const Orders = () => {
                         placeholder="Ej: P001"
                         {...register(`items.${index}.newProduct.internalCode`)}
                       />
+                      {errors.items?.[index]?.newProduct?.internalCode && <span className="error">{errors.items?.[index]?.newProduct?.internalCode.message}</span>}
                     </div>
                     <div className="field">
                       <label htmlFor={`new-product-barcode-${index}`}>Código de barras</label>
@@ -648,6 +684,7 @@ const Orders = () => {
                         placeholder="Ej: Cerveza IPA 500ml"
                         {...register(`items.${index}.newProduct.name`)}
                       />
+                      {errors.items?.[index]?.newProduct?.name && <span className="error">{errors.items?.[index]?.newProduct?.name.message}</span>}
                     </div>
                     <div className="field">
                       <label htmlFor={`new-product-cost-${index}`}>{rowUnitType === 'weight' ? 'Costo por kg' : 'Costo'}<RequiredMark /></label>
@@ -658,6 +695,7 @@ const Orders = () => {
                         placeholder="Ej: 900"
                         {...register(`items.${index}.newProduct.cost`)}
                       />
+                      {errors.items?.[index]?.newProduct?.cost && <span className="error">{errors.items?.[index]?.newProduct?.cost.message}</span>}
                     </div>
                     <div className="field">
                       <label htmlFor={`new-product-vat-${index}`}>IVA</label>
@@ -726,6 +764,12 @@ const Orders = () => {
                     )}
                   </div>
                 )}
+
+                {msg.at(`row-${index}`) && (
+                  <div className="field field-full">
+                    <FormMessage message={msg.at(`row-${index}`)} onClose={msg.clear} />
+                  </div>
+                )}
               </div>
             );
           })}
@@ -768,6 +812,7 @@ const Orders = () => {
         <button type="submit" disabled={discountExceedsTotal || isSubmitting}>
           {isSubmitting ? 'Generando remito…' : 'Generar remito'}
         </button>
+        <FormMessage message={msg.at()} onClose={msg.clear} />
         <RequiredLegend />
       </form>
 
@@ -810,6 +855,7 @@ const Orders = () => {
                         {cancellingId === order.id ? 'Anulando…' : 'Anular'}
                       </button>
                     )}
+                    <FormMessage message={msg.at(order.id)} onClose={msg.clear} />
                   </td>
                 </tr>
               );

@@ -9,6 +9,9 @@ import Spinner from '../../components/common/Spinner.jsx';
 import SearchInput from '../../components/common/SearchInput.jsx';
 import { matchesSearch } from '../../utils/search.js';
 import { RequiredMark, RequiredLegend } from '../../components/common/Required.jsx';
+import FormMessage from '../../components/common/FormMessage.jsx';
+import { useMessage } from '../../hooks/useMessage.js';
+import { applyServerFieldErrors } from '../../utils/serverErrors.js';
 
 const api = {
   getAll: customersApi.getCustomers,
@@ -20,15 +23,20 @@ const api = {
 const FISCAL_CONDITIONS = ['Consumidor Final', 'Responsable Inscripto', 'Monotributista', 'Exento'];
 
 const Customers = () => {
-  const { items: customers, loading, create, update, remove } = useResource(api);
+  const { items: customers, loading, loadError, create, update, remove, reload } = useResource(api);
+  const msg = useMessage();
   const { role } = useAuth();
   const isAdmin = role === 'admin';
   const [editingId, setEditingId] = useState(null);
   const [personType, setPersonType] = useState('individual');
   const [search, setSearch] = useState('');
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm();
+  const { register, handleSubmit, reset, setError, formState: { errors } } = useForm();
   const editForm = useForm();
+  const { errors: editErrors } = editForm.formState;
+  // Campos que muestran su error debajo (alta y edición)
+  const CREATE_FIELDS = ['businessName', 'firstName', 'fiscalCondition', 'email'];
+  const EDIT_FIELDS = ['email'];
 
   const onCreate = async (formData) => {
     const payload = {
@@ -45,11 +53,17 @@ const Customers = () => {
         : { firstName: formData.firstName, lastName: formData.lastName, businessName: null }),
     };
     const result = await create(payload);
-    if (result.success) reset();
+    if (result.success) {
+      reset();
+      msg.success('Cliente agregado', 'create');
+    } else if (!applyServerFieldErrors(result.error, setError, CREATE_FIELDS)) {
+      msg.error(result.message, 'create');
+    }
   };
 
   const startEdit = (customer) => {
     setEditingId(customer.id);
+    msg.clear();
     editForm.reset({
       businessName: customer.businessName || '',
       firstName: customer.firstName || '',
@@ -79,11 +93,20 @@ const Customers = () => {
       phone: formData.phone || null,
       email: formData.email || null,
     });
-    if (result.success) setEditingId(null);
+    if (result.success) {
+      const savedId = editingId;
+      setEditingId(null);
+      msg.success('Cambios guardados', savedId);
+    } else if (!applyServerFieldErrors(result.error, editForm.setError, EDIT_FIELDS)) {
+      msg.error(result.message, 'edit');
+    }
   };
 
-  const onDelete = (id) => {
-    if (confirm('¿Eliminar este cliente?')) remove(id);
+  const onDelete = async (id) => {
+    if (!confirm('¿Eliminar este cliente?')) return;
+    const result = await remove(id);
+    if (result.success) msg.success('Cliente eliminado', 'list');
+    else msg.error(result.message, id);
   };
 
   const displayName = (c) =>
@@ -93,8 +116,9 @@ const Customers = () => {
     try {
       const response = await downloadCustomerData(customer.id);
       saveBlob(response.data, filenameFromResponse(response, 'cliente-datos.xlsx'));
+      msg.success('Datos exportados: revisá tus descargas', customer.id);
     } catch (err) {
-      alert(await errorMessageFrom(err));
+      msg.error(await errorMessageFrom(err), customer.id);
     }
   };
 
@@ -107,10 +131,10 @@ const Customers = () => {
 
     try {
       const { data } = await anonymizeCustomer(customer.id);
-      alert(data.message);
-      window.location.reload();
+      await reload();
+      msg.success(data.message || 'Cliente anonimizado', 'list');
     } catch (err) {
-      alert(await errorMessageFrom(err));
+      msg.error(await errorMessageFrom(err), customer.id);
     }
   };
 
@@ -123,6 +147,7 @@ const Customers = () => {
   return (
     <div className="customers-page">
       <h1>Clientes</h1>
+      <FormMessage message={loadError ? { type: 'error', text: loadError } : null} />
 
       <form onSubmit={handleSubmit(onCreate)} className="customer-form">
         <div className="person-type-toggle">
@@ -202,9 +227,11 @@ const Customers = () => {
         <div className="field">
           <label htmlFor="email">Email</label>
           <input id="email" type="email" placeholder="Ej: juan.perez@mail.com" {...register('email')} />
+          {errors.email && <span className="error">{errors.email.message}</span>}
         </div>
 
         <button type="submit">Agregar cliente</button>
+        <FormMessage message={msg.at('create')} onClose={msg.clear} />
         <RequiredLegend />
       </form>
 
@@ -216,6 +243,7 @@ const Customers = () => {
         onChange={setSearch}
       />
 
+      <FormMessage message={msg.at('list')} />
       <div className="table-wrapper">
         <table>
           <thead>
@@ -287,11 +315,13 @@ const Customers = () => {
                       <div className="field">
                         <label htmlFor={`edit-email-${customer.id}`}>Email</label>
                         <input id={`edit-email-${customer.id}`} type="email" placeholder="Ej: juan.perez@mail.com" {...editForm.register('email')} />
+                        {editErrors.email && <span className="error">{editErrors.email.message}</span>}
                       </div>
                       <div className="inline-edit-actions">
                         <button type="submit">Guardar</button>
                         <button type="button" onClick={() => setEditingId(null)}>Cancelar</button>
                       </div>
+                      <FormMessage message={msg.at('edit')} onClose={msg.clear} />
                       <RequiredLegend />
                     </form>
                   </td>
@@ -310,6 +340,7 @@ const Customers = () => {
                           <button onClick={() => onAnonymize(customer)}>Anonimizar</button>
                         </>
                       )}
+                      <FormMessage message={msg.at(customer.id)} onClose={msg.clear} />
                     </td>
                   </>
                 )}

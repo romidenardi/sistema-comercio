@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { getMovementsByProduct, createStockMovement } from '../../api/stockMovements.api.js';
-import { useToast } from '../../context/ToastContext.jsx';
+import FormMessage from './FormMessage.jsx';
+import { useMessage } from '../../hooks/useMessage.js';
+import { serverMessage } from '../../utils/serverErrors.js';
 import Spinner from './Spinner.jsx';
 import { formatQuantity, formatSignedQuantity, quantityStep } from '../../utils/quantity.js';
 import { RequiredMark, RequiredLegend } from './Required.jsx';
@@ -9,7 +11,7 @@ import { RequiredMark, RequiredLegend } from './Required.jsx';
 const StockMovementPanel = ({ product, onStockChange }) => {
   const [movements, setMovements] = useState([]);
   const [loading, setLoading] = useState(true);
-  const { showToast } = useToast();
+  const msg = useMessage();
   const { register, handleSubmit, watch, reset } = useForm({ defaultValues: { type: 'in' } });
 
   const type = watch('type');
@@ -20,7 +22,7 @@ const StockMovementPanel = ({ product, onStockChange }) => {
       const { data } = await getMovementsByProduct(product.id);
       setMovements(data);
     } catch (err) {
-      showToast('No se pudo cargar el historial', 'error');
+      msg.error('No se pudo cargar el historial', 'history');
     } finally {
       setLoading(false);
     }
@@ -41,11 +43,10 @@ const StockMovementPanel = ({ product, onStockChange }) => {
       await createStockMovement(payload);
       reset({ type: 'in' });
       loadMovements();
-      showToast('Movimiento registrado');
+      msg.success('Movimiento registrado');
       onStockChange();
     } catch (err) {
-      const message = err.response?.data?.message || 'Error al registrar el movimiento';
-      showToast(message, 'error');
+      msg.error(serverMessage(err, 'Error al registrar el movimiento'));
     }
   };
 
@@ -88,11 +89,14 @@ const StockMovementPanel = ({ product, onStockChange }) => {
         </div>
 
         <button type="submit">Registrar</button>
+        <FormMessage message={msg.at()} onClose={msg.clear} />
         <RequiredLegend />
       </form>
 
       {loading ? (
         <Spinner label="Cargando historial..." />
+      ) : msg.at('history') ? (
+        <FormMessage message={msg.at('history')} />
       ) : (
         <div className="table-wrapper">
           <table>

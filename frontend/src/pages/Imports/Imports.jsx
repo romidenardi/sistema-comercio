@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { importProducts, importCustomers, importSuppliers } from '../../api/imports.api.js';
-import { useToast } from '../../context/ToastContext.jsx';
+import FormMessage from '../../components/common/FormMessage.jsx';
+import { useMessage } from '../../hooks/useMessage.js';
+import { serverMessage } from '../../utils/serverErrors.js';
 
 const IMPORT_TYPES = [
   { key: 'products', label: 'Productos', fn: importProducts, columns: 'Código Interno, Nombre, Marca, Categoría, Precio, Costo, Unidad (unidad/peso), PLU Balanza (opcional, solo para productos por peso). En productos por peso, Precio y Costo son por kg' },
@@ -13,25 +15,26 @@ const Imports = () => {
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [result, setResult] = useState(null);
-  const { showToast } = useToast();
+  const msg = useMessage();
 
   const current = IMPORT_TYPES.find((t) => t.key === selectedType);
 
   const onSubmit = async (e) => {
     e.preventDefault();
     if (!file) {
-      showToast('Elegí un archivo primero', 'error');
+      msg.error('Elegí un archivo primero');
       return;
     }
+    msg.clear();
     setUploading(true);
     setResult(null);
     try {
       const { data } = await current.fn(file);
       setResult(data);
-      showToast(`${data.created} filas importadas${data.errors.length ? `, ${data.errors.length} con errores` : ''}`);
+      msg.success(`${data.created} filas importadas${data.errors.length ? `, ${data.errors.length} con errores (detalle abajo)` : ''}`);
       setFile(null);
     } catch (err) {
-      showToast(err.response?.data?.message || 'Error al importar el archivo', 'error');
+      msg.error(serverMessage(err, 'Error al importar el archivo'));
     } finally {
       setUploading(false);
     }
@@ -51,13 +54,14 @@ const Imports = () => {
         <input
           type="file"
           accept=".csv,.xlsx,.xls"
-          onChange={(e) => setFile(e.target.files[0])}
+          onChange={(e) => { setFile(e.target.files[0]); msg.clear(); }}
         />
 
         <button type="submit" disabled={uploading}>
           {uploading ? 'Importando...' : 'Importar'}
         </button>
       </form>
+      <FormMessage message={msg.message} onClose={msg.clear} />
 
       <p className="import-hint">
         Columnas esperadas para <strong>{current.label}</strong>: {current.columns}

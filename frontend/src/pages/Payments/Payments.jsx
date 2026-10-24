@@ -4,6 +4,9 @@ import { useResource } from '../../hooks/useResource.js';
 import * as paymentsApi from '../../api/payments.api.js';
 import Spinner from '../../components/common/Spinner.jsx';
 import { RequiredMark, RequiredLegend } from '../../components/common/Required.jsx';
+import FormMessage from '../../components/common/FormMessage.jsx';
+import { useMessage } from '../../hooks/useMessage.js';
+import { applyServerFieldErrors } from '../../utils/serverErrors.js';
 
 const api = {
   getAll: paymentsApi.getPayments,
@@ -22,17 +25,19 @@ const buildPlansPayload = (hasInstallments, plans) => {
 };
 
 const Payments = () => {
-  const { items: payments, loading, create, update, remove } = useResource(api);
+  const { items: payments, loading, loadError, create, update, remove } = useResource(api);
+  const msg = useMessage();
   const [editingId, setEditingId] = useState(null);
 
   const createForm = useForm({
     defaultValues: { name: '', hasInstallments: false, installmentPlans: [emptyPlan] },
   });
-  const { register, handleSubmit, reset, watch, control, formState: { errors } } = createForm;
+  const { register, handleSubmit, reset, watch, control, setError, formState: { errors } } = createForm;
   const { fields, append, remove: removePlanField } = useFieldArray({ control, name: 'installmentPlans' });
   const hasInstallments = watch('hasInstallments');
 
   const editForm = useForm();
+  const { errors: editErrors } = editForm.formState;
   const editPlans = useFieldArray({ control: editForm.control, name: 'installmentPlans' });
   const editHasInstallments = editForm.watch('hasInstallments');
 
@@ -44,11 +49,15 @@ const Payments = () => {
     });
     if (result.success) {
       reset({ name: '', hasInstallments: false, installmentPlans: [emptyPlan] });
+      msg.success('Forma de pago agregada', 'create');
+    } else if (!applyServerFieldErrors(result.error, setError, ['name'])) {
+      msg.error(result.message, 'create');
     }
   };
 
   const startEdit = (payment) => {
     setEditingId(payment.id);
+    msg.clear();
     const plans = payment.installmentPlans && payment.installmentPlans.length > 0
       ? payment.installmentPlans.map((p) => ({ installments: p.installments, interestRate: p.interestRate }))
       : [emptyPlan];
@@ -66,11 +75,20 @@ const Payments = () => {
       active: formData.active === 'true',
       installmentPlans: buildPlansPayload(formData.hasInstallments, formData.installmentPlans),
     });
-    if (result.success) setEditingId(null);
+    if (result.success) {
+      const savedId = editingId;
+      setEditingId(null);
+      msg.success('Cambios guardados', savedId);
+    } else if (!applyServerFieldErrors(result.error, editForm.setError, ['name'])) {
+      msg.error(result.message, 'edit');
+    }
   };
 
-  const onDelete = (id) => {
-    if (confirm('¿Eliminar esta forma de pago?')) remove(id);
+  const onDelete = async (id) => {
+    if (!confirm('¿Eliminar esta forma de pago?')) return;
+    const result = await remove(id);
+    if (result.success) msg.success('Forma de pago eliminada', 'list');
+    else msg.error(result.message, id);
   };
 
   const planSummary = (payment) => {
@@ -85,6 +103,7 @@ const Payments = () => {
   return (
     <div className="payments-page">
       <h1>Formas de pago</h1>
+      <FormMessage message={loadError ? { type: 'error', text: loadError } : null} />
 
       <form onSubmit={handleSubmit(onCreate)} className="payment-form">
         <div className="field">
@@ -145,9 +164,11 @@ const Payments = () => {
         )}
 
         <button type="submit">Agregar forma de pago</button>
+        <FormMessage message={msg.at('create')} onClose={msg.clear} />
         <RequiredLegend />
       </form>
 
+      <FormMessage message={msg.at('list')} />
       <div className="table-wrapper">
         <table>
           <thead>
@@ -169,8 +190,9 @@ const Payments = () => {
                         <input
                           id={`edit-name-${payment.id}`}
                           placeholder="Ej: Tarjeta de crédito"
-                          {...editForm.register('name', { required: true })}
+                          {...editForm.register('name', { required: 'El nombre es obligatorio' })}
                         />
+                        {editErrors.name && <span className="error">{editErrors.name.message}</span>}
                       </div>
                       <div className="field">
                         <label htmlFor={`edit-active-${payment.id}`}>Estado</label>
@@ -234,6 +256,7 @@ const Payments = () => {
                         <button type="submit">Guardar</button>
                         <button type="button" onClick={() => setEditingId(null)}>Cancelar</button>
                       </div>
+                      <FormMessage message={msg.at('edit')} onClose={msg.clear} />
                       <RequiredLegend />
                     </form>
                   </td>
@@ -245,6 +268,7 @@ const Payments = () => {
                     <td data-label="Acciones">
                       <button onClick={() => startEdit(payment)}>Editar</button>
                       <button onClick={() => onDelete(payment.id)}>Eliminar</button>
+                      <FormMessage message={msg.at(payment.id)} onClose={msg.clear} />
                     </td>
                   </>
                 )}
