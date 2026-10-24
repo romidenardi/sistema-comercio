@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { Business, User, PlatformAdmin, sequelize } from '../models/index.js';
+import QRCode from 'qrcode';
+import { Business, User, PlatformAdmin, AuditLog, sequelize } from '../models/index.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { httpError } from '../utils/httpError.js';
 import { generateInviteToken, INVITE_TTL_MS } from '../utils/inviteToken.js';
@@ -8,6 +9,10 @@ import { sendMail } from '../utils/mailer.js';
 import { inviteEmail } from '../utils/mailTemplates.js';
 import { closureStartedEmail } from '../utils/closureEmails.js';
 import { resetDemoBusiness } from '../services/demo.service.js';
+import { audit } from '../utils/audit.js';
+import {
+  generateTotpSecret, verifyTotp, otpauthUrl, generateRecoveryCodes, consumeRecoveryCode, looksLikeRecoveryCode,
+} from '../utils/totp.js';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -16,20 +21,163 @@ const CLOSURE_DAYS = 30;
 const buildInviteUrl = (token) =>
   `${process.env.APP_URL.replace(/\/$/, '')}/activar?token=${token}`;
 
+// ---------------------------------------------------------------------------------------------
+// Ingreso del superadmin en dos pasos: contraseña y después el código de la app de autenticación.
+// 1. POST /login con email y contraseña. Si son correctos devuelve un token corto (mfaToken), que
+//    no da acceso a nada: solo sirve para el paso 2. Si el segundo factor todavía no está
+//    configurado, el paso 2 es configurarlo (mfaSetupRequired).
+// 2a. POST /login/mfa con el código de 6 dígitos (o un código de recuperación) → token de plataforma.
+// 2b. Primera vez: POST /login/mfa/setup (muestra el QR) y POST /login/mfa/enable con el primer
+//     código → token de plataforma y los 10 códigos de recuperación, que se muestran una sola vez.
+// ---------------------------------------------------------------------------------------------
+const MFA_TOKEN_TTL = '10m';
+const TOTP_ISSUER = 'Talarix';
+
+const signPlatformToken = (admin) =>
+  jwt.sign({ adminId: admin.id, scope: 'platform' }, process.env.PLATFORM_JWT_SECRET, { expiresIn: '2h' });
+
+const signMfaToken = (admin, purpose) =>
+  jwt.sign({ adminId: admin.id, scope: 'platform-mfa', purpose }, process.env.PLATFORM_JWT_SECRET, {
+    expiresIn: MFA_TOKEN_TTL,
+  });
+
+// Valida el token del paso 1 y devuelve el superadmin
+const adminFromMfaToken = async (token, purpose) => {
+  let decoded;
+  try {
+    decoded = jwt.verify(String(token || ''), process.env.PLATFORM_JWT_SECRET, { algorithms: ['HS256'] });
+  } catch {
+    throw httpError('El ingreso venció. Volvé a poner tu email y contraseña.', 401);
+  }
+  if (decoded.scope !== 'platform-mfa' || decoded.purpose !== purpose || !decoded.adminId) {
+    throw httpError('El ingreso no es válido. Volvé a empezar.', 401);
+  }
+  const admin = await PlatformAdmin.findOne({ where: { id: decoded.adminId, active: true } });
+  if (!admin) throw httpError('El ingreso no es válido. Volvé a empezar.', 401);
+  return admin;
+};
+
+const respondWithSession = (res, admin, extra = {}) => {
+  res.json({
+    token: signPlatformToken(admin),
+    admin: { id: admin.id, name: admin.name },
+    recoveryCodesLeft: Array.isArray(admin.recoveryCodes) ? admin.recoveryCodes.length : 0,
+    ...extra,
+  });
+};
+
 export const platformLogin = asyncHandler(async (req, res) => {
   const email = String(req.body.email || '').trim().toLowerCase();
   const password = String(req.body.password || '');
 
   const admin = email ? await PlatformAdmin.findOne({ where: { email } }) : null;
   const valid = admin && admin.active && (await bcrypt.compare(password, admin.passwordHash));
-  if (!valid) throw httpError('Credenciales inválidas', 401);
+  if (!valid) {
+    await audit(req, {
+      action: 'platform.login_failed', actorType: 'platform', actorId: admin?.id ?? null, businessId: null,
+    });
+    throw httpError('Credenciales inválidas', 401);
+  }
 
-  const token = jwt.sign(
-    { adminId: admin.id, scope: 'platform' },
-    process.env.PLATFORM_JWT_SECRET,
-    { expiresIn: '2h' }
-  );
-  res.json({ token, admin: { id: admin.id, name: admin.name } });
+  if (!admin.totpEnabled) {
+    return res.json({ mfaSetupRequired: true, mfaToken: signMfaToken(admin, 'setup') });
+  }
+  res.json({ mfaRequired: true, mfaToken: signMfaToken(admin, 'verify') });
+});
+
+export const platformLoginMfa = asyncHandler(async (req, res) => {
+  const admin = await adminFromMfaToken(req.body.mfaToken, 'verify');
+  const code = String(req.body.code || '').trim();
+  const who = { actorType: 'platform', actorId: admin.id, businessId: null };
+
+  if (looksLikeRecoveryCode(code)) {
+    const remaining = consumeRecoveryCode(admin.recoveryCodes, code);
+    if (!remaining) {
+      await audit(req, { action: 'platform.mfa_failed', ...who });
+      throw httpError('El código de recuperación no es válido o ya se usó', 401);
+    }
+    await admin.update({ recoveryCodes: remaining });
+    await audit(req, { action: 'platform.recovery_code_used', detail: { left: remaining.length }, ...who });
+    await audit(req, { action: 'platform.login', ...who });
+    return respondWithSession(res, admin, { usedRecoveryCode: true });
+  }
+
+  const step = verifyTotp(admin.totpSecret, code, { lastStep: admin.totpLastStep });
+  if (step === null) {
+    await audit(req, { action: 'platform.mfa_failed', ...who });
+    throw httpError('El código no es correcto. Fijate el que muestra ahora la app y probá de nuevo.', 401);
+  }
+  await admin.update({ totpLastStep: step });
+  await audit(req, { action: 'platform.login', ...who });
+  respondWithSession(res, admin);
+});
+
+export const platformMfaSetup = asyncHandler(async (req, res) => {
+  const admin = await adminFromMfaToken(req.body.mfaToken, 'setup');
+  if (admin.totpEnabled) throw httpError('El segundo factor ya está configurado. Volvé a ingresar.', 409);
+
+  const secret = generateTotpSecret();
+  await admin.update({ totpPendingSecret: secret });
+
+  const url = otpauthUrl({ issuer: TOTP_ISSUER, account: admin.email, secret });
+  const qrDataUrl = await QRCode.toDataURL(url, { margin: 1, width: 220 });
+  res.json({ secret, qrDataUrl });
+});
+
+export const platformMfaEnable = asyncHandler(async (req, res) => {
+  const admin = await adminFromMfaToken(req.body.mfaToken, 'setup');
+  if (admin.totpEnabled) throw httpError('El segundo factor ya está configurado. Volvé a ingresar.', 409);
+  if (!admin.totpPendingSecret) throw httpError('Primero escaneá el código QR');
+
+  const step = verifyTotp(admin.totpPendingSecret, req.body.code);
+  if (step === null) {
+    throw httpError('El código no es correcto. Fijate el que muestra ahora la app y probá de nuevo.');
+  }
+
+  const { codes, hashes } = generateRecoveryCodes();
+  await admin.update({
+    totpEnabled: true,
+    totpSecret: admin.totpPendingSecret,
+    totpPendingSecret: null,
+    totpLastStep: step,
+    recoveryCodes: hashes,
+  });
+  const who = { actorType: 'platform', actorId: admin.id, businessId: null };
+  await audit(req, { action: 'platform.mfa_enabled', ...who });
+  await audit(req, { action: 'platform.login', ...who });
+  respondWithSession(res, admin, { recoveryCodes: codes });
+});
+
+// Últimos movimientos del registro de auditoría, con nombres legibles
+export const listAuditLog = asyncHandler(async (req, res) => {
+  const limit = Math.min(Math.max(Number(req.query.limit) || 100, 1), 500);
+  const where = {};
+  if (req.query.businessId) where.businessId = String(req.query.businessId);
+
+  const rows = await AuditLog.findAll({ where, order: [['createdAt', 'DESC']], limit });
+
+  const ids = (type) => [...new Set(rows.filter((r) => r.actorType === type && r.actorId).map((r) => r.actorId))];
+  const businessIds = [...new Set(rows.map((r) => r.businessId).filter(Boolean))];
+  const [admins, users, businesses] = await Promise.all([
+    PlatformAdmin.findAll({ where: { id: ids('platform') }, attributes: ['id', 'email'] }),
+    User.findAll({ where: { id: ids('user') }, attributes: ['id', 'email'] }),
+    Business.findAll({ where: { id: businessIds }, attributes: ['id', 'name'] }),
+  ]);
+  const label = new Map([...admins, ...users].map((x) => [x.id, x.email]));
+  const businessName = new Map(businesses.map((b) => [b.id, b.name]));
+
+  res.json(rows.map((r) => ({
+    id: r.id,
+    createdAt: r.createdAt,
+    action: r.action,
+    actorType: r.actorType,
+    actor: r.actorType === 'system' ? 'Sistema' : (label.get(r.actorId) || (r.actorId ? 'Usuario borrado' : '—')),
+    business: r.businessId ? (businessName.get(r.businessId) || 'Comercio borrado') : null,
+    targetType: r.targetType,
+    targetId: r.targetId,
+    detail: r.detail,
+    ip: r.ip,
+  })));
 });
 
 export const listBusinesses = asyncHandler(async (req, res) => {
@@ -112,6 +260,8 @@ export const createBusiness = asyncHandler(async (req, res) => {
     throw error;
   }
 
+  await audit(req, { action: 'business.created', businessId: business.id, targetType: 'business', targetId: business.id, detail: { type } });
+
   let demoSeeded = null;
   if (type === 'demo') {
     try {
@@ -154,7 +304,12 @@ export const setBusinessStatus = asyncHandler(async (req, res) => {
     throw httpError('El comercio tiene una baja pendiente. Cancelá la baja antes de cambiar su estado.', 409);
   }
 
+  const previous = business.status;
   await business.update({ status });
+  await audit(req, {
+    action: 'business.status_changed', businessId: business.id, targetType: 'business', targetId: business.id,
+    detail: { from: previous, to: status },
+  });
   res.json({ id: business.id, name: business.name, status: business.status });
 });
 
@@ -171,6 +326,10 @@ export const startClosure = asyncHandler(async (req, res) => {
 
   const deleteAt = new Date(Date.now() + CLOSURE_DAYS * 24 * 60 * 60 * 1000);
   await business.update({ status: 'closing', deleteAt });
+  await audit(req, {
+    action: 'business.closure_started', businessId: business.id, targetType: 'business', targetId: business.id,
+    detail: { deleteAt },
+  });
 
   const admins = await User.findAll({
     where: { businessId: business.id, role: 'admin', active: true },
@@ -206,6 +365,7 @@ export const cancelClosure = asyncHandler(async (req, res) => {
   if (business.status !== 'closing') throw httpError('El comercio no tiene una baja pendiente', 409);
 
   await business.update({ status: 'active', deleteAt: null });
+  await audit(req, { action: 'business.closure_cancelled', businessId: business.id, targetType: 'business', targetId: business.id });
   res.json({ id: business.id, name: business.name, status: business.status });
 });
 
@@ -223,6 +383,9 @@ export const reinviteUser = asyncHandler(async (req, res) => {
   const inviteExpiresAt = new Date(Date.now() + INVITE_TTL_MS);
 
   await user.update({ passwordHash: null, inviteTokenHash: hash, inviteExpiresAt, active: true });
+  await audit(req, {
+    action: 'user.reinvited', businessId: business.id, targetType: 'user', targetId: user.id, detail: { role: user.role },
+  });
 
   const inviteUrl = buildInviteUrl(token);
   const mail = await sendMail({
@@ -245,5 +408,6 @@ export const reinviteUser = asyncHandler(async (req, res) => {
 
 export const resetDemo = asyncHandler(async (req, res) => {
   await resetDemoBusiness(req.params.id);
+  await audit(req, { action: 'demo.reset', businessId: req.params.id, targetType: 'business', targetId: req.params.id });
   res.json({ message: 'Demo reiniciada' });
 });

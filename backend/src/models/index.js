@@ -15,6 +15,7 @@ import OrderItem from './orderItem.model.js';
 import ComboItem from './comboItem.model.js';
 import PlatformAdmin from './platformAdmin.model.js';
 import ClosureRecord from './closureRecord.model.js';
+import AuditLog from './auditLog.model.js';
 
 // Borrado de registros con historial: las claves de remitos y compras hacia clientes, proveedores,
 // productos y formas de pago son RESTRICT. La base rechaza borrar algo que ya se usó en un remito
@@ -90,5 +91,5 @@ ComboItem.belongsTo(Product, { as: 'product', foreignKey: 'productId' });
 export {
   sequelize, Business, Category, Product, StockMovement, Payment, InstallmentPlan,
   User, Customer, Supplier, Purchase, PurchaseItem, Order, OrderItem, ComboItem, PlatformAdmin,
-  ClosureRecord,
+  ClosureRecord, AuditLog,
 };

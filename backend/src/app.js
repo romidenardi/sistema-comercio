@@ -1,7 +1,8 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
+import jwt from 'jsonwebtoken';
 import authRoutes from './routes/auth.routes.js';
 import platformRoutes from './routes/platform.routes.js';
 import categoryRoutes from './routes/category.routes.js';
@@ -66,7 +67,26 @@ const loginByAccount = (prefix) => rateLimit({
   },
 });
 app.use('/api/auth/login', loginByIp, loginByAccount('login'));
-app.use('/api/platform/login', loginByIp, loginByAccount('platform'));
+// Superadmin. Paso 1 (contraseña): mismos límites que el ingreso de usuarios. app.post y no app.use,
+// para que no alcance también a /login/mfa*, que tiene su propio límite.
+app.post('/api/platform/login', loginByIp, loginByAccount('platform'));
+
+// Paso 2 (código de 6 dígitos): 5 códigos fallidos cada 15 minutos por superadmin. La clave sale del
+// token del paso 1 (sin verificarlo acá: lo verifica el controlador, y uno falso no prueba códigos).
+const mfaKey = (req) => {
+  const decoded = jwt.decode(String(req.body?.mfaToken || ''));
+  return `platform-mfa:${decoded?.adminId || ipKeyGenerator(req.ip)}`;
+};
+const platformMfaLimiter = rateLimit({
+  windowMs: FIFTEEN_MINUTES,
+  limit: 5,
+  skipSuccessfulRequests: true,
+  keyGenerator: mfaKey,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: 'Demasiados códigos incorrectos. Esperá 15 minutos y volvé a ingresar.' },
+});
+app.use('/api/platform/login/mfa', loginByIp, platformMfaLimiter);
 
 // Activar cuenta, recuperar y restablecer contraseña: cuentan todos los pedidos (mandan mails o usan links)
 const accountLinksLimiter = rateLimit({

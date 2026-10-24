@@ -4,6 +4,7 @@ import {
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { httpError } from '../utils/httpError.js';
 import { round3 } from '../utils/numbers.js';
+import { audit } from '../utils/audit.js';
 
 const arDate = (date) =>
   new Date(date).toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' });
@@ -86,6 +87,8 @@ export const cancelOrder = asyncHandler(async (req, res) => {
     await t.rollback();
     throw error;
   }
+
+  await audit(req, { action: 'order.cancelled', targetType: 'order', targetId: req.params.id });
 
   const fullOrder = await Order.findOne({
     where: { id: req.params.id, businessId },

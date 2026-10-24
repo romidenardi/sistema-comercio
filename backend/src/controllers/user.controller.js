@@ -6,6 +6,7 @@ import { sendMail, appUrl } from '../utils/mailer.js';
 import { userCreatedEmail } from '../utils/mailTemplates.js';
 import { issueAccessLink } from '../utils/accessLinks.js';
 import { checkPassword } from '../utils/password.js';
+import { audit } from '../utils/audit.js';
 
 const ROLES = ['admin', 'editor', 'operador'];
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -78,6 +79,10 @@ export const createUser = asyncHandler(async (req, res) => {
     mail = { type: 'created', sent: result.sent };
   }
 
+  await audit(req, {
+    action: 'user.created', targetType: 'user', targetId: user.id,
+    detail: { role: user.role, invite: sendInvite },
+  });
   res.status(201).json({ ...toSafeUser(user), mail });
 });
 
@@ -98,6 +103,13 @@ export const updateUser = asyncHandler(async (req, res) => {
     throw httpError('No podés desactivar tu propio usuario');
   }
 
+  // Qué cambió, para el registro de auditoría (sin datos personales: solo qué campos y el rol)
+  const changes = {};
+  if (role !== undefined && role !== user.role) changes.role = { from: user.role, to: role };
+  if (active !== undefined && active !== user.active) changes.active = active;
+  if (password) changes.password = true;
+  if (email !== undefined && email !== user.email) changes.email = true;
+
   if (email !== undefined && email !== user.email) {
     const taken = await User.findOne({ where: { email } });
     if (taken) throw httpError('Ya existe un usuario con ese email');
@@ -116,6 +128,9 @@ export const updateUser = asyncHandler(async (req, res) => {
   }
 
   await user.save();
+  if (Object.keys(changes).length) {
+    await audit(req, { action: 'user.updated', targetType: 'user', targetId: user.id, detail: changes });
+  }
   res.json(toSafeUser(user));
 });
 
@@ -128,6 +143,7 @@ export const sendAccessLink = asyncHandler(async (req, res) => {
 
   const business = await Business.findByPk(req.user.businessId, { attributes: ['name'] });
   const result = await issueAccessLink(user, business?.name || 'tu comercio');
+  await audit(req, { action: 'user.access_link_sent', targetType: 'user', targetId: user.id, detail: { type: result.type } });
 
   res.json({
     email: user.email,
@@ -155,5 +171,6 @@ export const deleteUser = asyncHandler(async (req, res) => {
   }
 
   await user.destroy();
+  await audit(req, { action: 'user.deleted', targetType: 'user', targetId: user.id, detail: { role: user.role } });
   res.status(204).send();
 });

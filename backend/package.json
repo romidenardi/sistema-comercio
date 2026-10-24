@@ -25,6 +25,7 @@
     "mysql2": "^3.24.4",
     "node-cron": "^4.6.0",
     "nodemailer": "^10.1.0",
+    "qrcode": "^1.5.4",
     "sequelize": "^6.37.8",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },

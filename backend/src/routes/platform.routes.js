@@ -1,6 +1,10 @@
 import { Router } from 'express';
 import {
   platformLogin,
+  platformLoginMfa,
+  platformMfaSetup,
+  platformMfaEnable,
+  listAuditLog,
   listBusinesses,
   createBusiness,
   setBusinessStatus,
@@ -13,9 +17,14 @@ import { platformAuthMiddleware } from '../middlewares/platformAuth.middleware.j
 
 const router = Router();
 
+// Ingreso en dos pasos (ver platform.controller.js). Estas rutas no exigen sesión.
 router.post('/login', platformLogin);
+router.post('/login/mfa', platformLoginMfa);
+router.post('/login/mfa/setup', platformMfaSetup);
+router.post('/login/mfa/enable', platformMfaEnable);
 
 router.use(platformAuthMiddleware);
+router.get('/audit', listAuditLog);
 router.get('/businesses', listBusinesses);
 router.post('/businesses', createBusiness);
 router.patch('/businesses/:id/status', setBusinessStatus);

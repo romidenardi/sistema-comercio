@@ -2,6 +2,7 @@ import { Customer, Order, OrderItem } from '../models/index.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { httpError } from '../utils/httpError.js';
 import { buildWorkbookBuffer, sheetFrom, columnsOf, todayStamp } from '../services/export.service.js';
+import { audit } from '../utils/audit.js';
 
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
@@ -59,6 +60,7 @@ export const exportCustomerData = asyncHandler(async (req, res) => {
   ]);
 
   console.log(`[derechos] acceso · comercio ${businessId} · cliente ${customer.id} · usuario ${req.user.id}`);
+  await audit(req, { action: 'customer.data_exported', targetType: 'customer', targetId: customer.id });
 
   res.setHeader('Content-Type', XLSX_MIME);
   res.setHeader('Content-Disposition', `attachment; filename="cliente-datos-${todayStamp()}.xlsx"`);
@@ -83,6 +85,7 @@ export const anonymizeCustomer = asyncHandler(async (req, res) => {
   });
 
   console.log(`[derechos] supresión · comercio ${req.user.businessId} · cliente ${customer.id} · usuario ${req.user.id}`);
+  await audit(req, { action: 'customer.anonymized', targetType: 'customer', targetId: customer.id });
 
   res.json({ message: 'Los datos personales del cliente fueron anonimizados. Sus remitos se conservan.' });
 });

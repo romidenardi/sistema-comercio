@@ -21,7 +21,8 @@ export const platformAuthMiddleware = async (req, res, next) => {
 
   try {
     const admin = await PlatformAdmin.findOne({
-      where: { id: decoded.adminId, active: true },
+      // Solo sesiones de un superadmin con el segundo factor activo
+      where: { id: decoded.adminId, active: true, totpEnabled: true },
       attributes: ['id'],
     });
     if (!admin) return res.status(401).json({ message: 'Sesión inválida' });

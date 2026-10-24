@@ -2,7 +2,7 @@
 
 API de gestión para pequeños comercios (stock, clientes, proveedores, compras, remitos, formas de pago, cuotas, descuentos, IVA, combos y productos por peso con balanza). Multi-comercio: una sola base de datos, con los datos de cada comercio separados por `businessId`.
 
-**Stack:** Node.js, Express 5, Sequelize, MySQL, JWT, Nodemailer, node-cron, xlsx (SheetJS 0.20.3, instalado desde el CDN oficial). Desplegado en Railway.
+**Stack:** Node.js, Express 5, Sequelize, MySQL, JWT, Nodemailer, node-cron, qrcode, xlsx (SheetJS 0.20.3, instalado desde el CDN oficial). Desplegado en Railway.
 
 ## Entornos
 
@@ -88,7 +88,9 @@ Todas las rutas cuelgan de `/api`. Salvo `auth` y `platform`, exigen token de us
 |---|---|---|
 | `/auth/login`, `/auth/activate` | pública | Ingreso y activación de cuenta con aceptación de términos |
 | `/auth/forgot-password`, `/auth/reset-password` | pública | Recuperar contraseña por mail |
+| `/platform/login`, `/platform/login/mfa*` | pública | Ingreso del superadmin en dos pasos (contraseña y código de Google Authenticator) |
 | `/platform/*` | superadmin | Alta de comercios, estado, reinvitar, reiniciar demo |
+| `/platform/audit` | superadmin | Registro de actividad (`?limit=` hasta 500, `?businessId=`) |
 | `/platform/businesses/:id/closure` | superadmin | `POST` inicia la baja (pide el nombre exacto del comercio en `confirmName`); `DELETE` la cancela |
 | `/categories`, `/products`, `/stock-movements` | autenticados | Catálogo y movimientos de stock |
 | `/combos` | autenticados | Combos de productos |
@@ -189,7 +191,37 @@ La contraseña del superadmin tiene que tener **al menos 12 caracteres**.
 
 **Recuperar o cambiar la contraseña del superadmin:** a propósito no hay "Olvidé mi contraseña" en `/plataforma`: si alguien tomara el control del mail, podría quedarse con toda la plataforma. Se cambia corriendo el mismo script con el **mismo email** y la contraseña nueva: si el email ya existe, actualiza la contraseña (y lo reactiva) en lugar de crear otro. Los ingresos que ya estaban abiertos siguen valiendo hasta que vence su token (2 h). Las variables escritas en la línea de comando tienen prioridad sobre las del `.env`.
 
-Para correrlo contra Railway hay que habilitar temporalmente el TCP Proxy del MySQL (Settings → Networking) y **desactivarlo al terminar**. En ese caso, `DB_HOST` y `DB_PORT` son los del proxy (`xxx.proxy.rlwy.net` y su puerto), y `DB_NAME`, `DB_USER` y `DB_PASSWORD` salen de las variables del servicio MySQL.
+### Segundo factor (Google Authenticator)
+El ingreso a `/plataforma` pide la contraseña y después un código de 6 dígitos de la app. Es obligatorio: sin el segundo factor activado, el token de plataforma no sirve (lo revisa `platformAuth.middleware.js`).
+
+1. `POST /platform/login` con email y contraseña devuelve un `mfaToken` de 10 minutos, que solo sirve para el paso siguiente.
+2. **Primera vez** (`mfaSetupRequired`): `POST /platform/login/mfa/setup` genera la clave y devuelve el QR; `POST /platform/login/mfa/enable` con el primer código lo activa y devuelve **10 códigos de recuperación**, que se muestran una sola vez.
+3. **Siguientes veces** (`mfaRequired`): `POST /platform/login/mfa` con el código de la app o con un código de recuperación.
+
+Detalles:
+- TOTP estándar (RFC 6238: SHA-1, 6 dígitos, 30 segundos), implementado en `utils/totp.js` con `node:crypto`. Acepta el código anterior y el siguiente por diferencias de reloj, y no acepta dos veces el mismo (`totp_last_step`).
+- Los códigos de recuperación se guardan como hash (sha256) y cada uno sirve una vez. Al entrar con uno, o cuando quedan 3 o menos, la pantalla avisa.
+- Límite: 5 códigos incorrectos cada 15 minutos por superadmin (además del límite por IP).
+- La clave de la app se guarda en la base (`totp_secret`). Quien tenga acceso a la base puede verla: por eso el acceso a la base sigue siendo lo más importante de proteger.
+
+**Si se pierde el celular:** entrar con un código de recuperación. Para generar códigos nuevos o pasar la app a otro celular, desactivar el segundo factor con el script y volver a ingresar: después de la contraseña se pide configurarlo otra vez con un QR nuevo.
+```bash
+DB_HOST=... DB_PORT=... DB_NAME=... DB_USER=... DB_PASSWORD='...' \
+PLATFORM_ADMIN_EMAIL=mail@dominio.com node scripts/disablePlatformMfa.js
+```
+Antes de ese ingreso, borrar en Google Authenticator la entrada vieja de Talarix.
+
+Para correr los scripts contra Railway hay que habilitar temporalmente el TCP Proxy del MySQL (Settings → Networking) y **desactivarlo al terminar**. En ese caso, `DB_HOST` y `DB_PORT` son los del proxy (`xxx.proxy.rlwy.net` y su puerto), y `DB_NAME`, `DB_USER` y `DB_PASSWORD` salen de las variables del servicio MySQL.
+
+## Registro de actividad
+Tabla `audit_logs` (la crea `sync`, sin claves foráneas: un registro sobrevive aunque se borre el usuario). Se ve en `/plataforma`, sección Actividad. `utils/audit.js` registra quién (superadmin, usuario o sistema), qué, sobre qué, desde qué IP y un detalle. Nunca corta la acción si falla el registro.
+
+Qué se registra:
+- **Superadmin:** ingresos, ingresos fallidos (contraseña o código), activación del segundo factor, uso de códigos de recuperación, alta de comercios, cambios de estado, inicio y cancelación de bajas, reinvitaciones y reinicio de la demo.
+- **Usuarios de los comercios:** exportación de todos los datos, exportación y anonimización de clientes, alta, cambios, baja y envío de links de usuarios, y anulación de remitos.
+- **Sistema:** eliminación definitiva de un comercio. Al eliminarlo se borran sus registros y queda solo ese último (sin datos personales).
+
+No guarda contraseñas, códigos ni datos de clientes: solo IDs, roles y estados. Todavía no hay borrado automático de registros viejos.
 
 ## Cambios en la base de datos
 
@@ -266,6 +298,15 @@ ALTER TABLE purchases ADD COLUMN request_id CHAR(36) BINARY NULL
 ALTER TABLE purchases ADD UNIQUE INDEX uq_purchases_business_request (business_id, request_id)
 ```
 Los remitos y compras anteriores quedan con `request_id` en `NULL`, que el índice único admite.
+
+**Segundo factor del superadmin** (`platform_admins`, 24/10/2026). **Antes** de desplegar: el modelo lee estas columnas en cada ingreso. La tabla `audit_logs` la crea `sync`.
+```sql
+ALTER TABLE platform_admins ADD COLUMN totp_enabled TINYINT(1) NOT NULL DEFAULT 0
+ALTER TABLE platform_admins ADD COLUMN totp_secret VARCHAR(64) NULL
+ALTER TABLE platform_admins ADD COLUMN totp_pending_secret VARCHAR(64) NULL
+ALTER TABLE platform_admins ADD COLUMN totp_last_step BIGINT NULL
+ALTER TABLE platform_admins ADD COLUMN recovery_codes JSON NULL
+```
 
 **Versión de sesión** (`users`, 23/10/2026). También **antes** de desplegar: el modelo lee la columna en cada ingreso y en cada pedido.
 ```sql
@@ -344,4 +385,4 @@ Restaurar: servicio MySQL → Backups → elegir fecha → Restore → revisar �
 La versión vigente de los términos y del aviso de privacidad está en `src/utils/legal.js` y debe coincidir con `LEGAL_VERSION` del frontend. Hoy es un borrador (`2026-10-borrador-1`) pendiente de revisión legal. La casilla de contacto es `hola@talarix.com.ar`.
 
 ---
-Última actualización: 23/10/2026 (librería xlsx, límites de importación y recuperación del superadmin).
+Última actualización: 24/10/2026 (segundo factor del superadmin y registro de actividad).
