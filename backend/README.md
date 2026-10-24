@@ -2,7 +2,7 @@
 
 API de gestión para pequeños comercios (stock, clientes, proveedores, compras, remitos, formas de pago, cuotas, descuentos, IVA, combos y productos por peso con balanza). Multi-comercio: una sola base de datos, con los datos de cada comercio separados por `businessId`.
 
-**Stack:** Node.js, Express 5, Sequelize, MySQL, JWT, Nodemailer, node-cron, xlsx (SheetJS). Desplegado en Railway.
+**Stack:** Node.js, Express 5, Sequelize, MySQL, JWT, Nodemailer, node-cron, xlsx (SheetJS 0.20.3, instalado desde el CDN oficial). Desplegado en Railway.
 
 ## Entornos
 
@@ -116,6 +116,7 @@ Detalles que conviene saber:
 - Stock y cantidades (`products.stock`, `order_items`, `purchase_items`, `stock_movements`) son `DECIMAL(12,3)`. Sequelize devuelve los DECIMAL como texto: los modelos usan `numericGetter` (`utils/decimalColumn.js`) para que lleguen como número, y las cuentas con cantidades se redondean con `round3`.
 - **Balanza:** cada producto por peso puede tener un `scalePlu` (1 a 9999), único por comercio. El comercio guarda en `businesses.scale_config` cómo se arma la etiqueta EAN-13 (prefijo, posición del PLU y del valor, si trae peso o importe, decimales, dígito de control). El valor de fábrica es el de Systel. La etiqueta se interpreta en el frontend; el backend solo guarda la configuración.
 - Los combos siguen usando cantidades enteras y no admiten productos por peso (se filtra en el frontend).
+- **Importación:** hasta 5 MB y 5.000 filas por archivo, solo la primera hoja. Además del filtro por extensión, `utils/parseSpreadsheet.js` revisa que el contenido coincida (un .xlsx tiene que ser un ZIP; un .csv, texto) y responde `400` con un mensaje claro si el archivo no se puede leer.
 - La importación acepta la columna opcional `PLU Balanza` (solo con `Unidad = peso`); en productos por peso, Precio y Costo son por kg.
 
 ## Seguridad y multi-comercio
@@ -184,7 +185,9 @@ DB_HOST=... DB_PORT=... DB_NAME=... DB_USER=... DB_PASSWORD='...' \
 PLATFORM_ADMIN_EMAIL=mail@dominio.com PLATFORM_ADMIN_PASSWORD='...' PLATFORM_ADMIN_NAME='Nombre' \
 node scripts/createPlatformAdmin.js
 ```
-La contraseña del superadmin tiene que tener **al menos 12 caracteres**. Las variables escritas en la línea de comando tienen prioridad sobre las del `.env`.
+La contraseña del superadmin tiene que tener **al menos 12 caracteres**.
+
+**Recuperar o cambiar la contraseña del superadmin:** a propósito no hay "Olvidé mi contraseña" en `/plataforma`: si alguien tomara el control del mail, podría quedarse con toda la plataforma. Se cambia corriendo el mismo script con el **mismo email** y la contraseña nueva: si el email ya existe, actualiza la contraseña (y lo reactiva) en lugar de crear otro. Los ingresos que ya estaban abiertos siguen valiendo hasta que vence su token (2 h). Las variables escritas en la línea de comando tienen prioridad sobre las del `.env`.
 
 Para correrlo contra Railway hay que habilitar temporalmente el TCP Proxy del MySQL (Settings → Networking) y **desactivarlo al terminar**. En ese caso, `DB_HOST` y `DB_PORT` son los del proxy (`xxx.proxy.rlwy.net` y su puerto), y `DB_NAME`, `DB_USER` y `DB_PASSWORD` salen de las variables del servicio MySQL.
 
@@ -297,7 +300,8 @@ git push
 git checkout staging
 ```
 5. Si Railway no puede bajar un commit ("failed to fetch snapshot"), no usar **Redeploy**: vuelve a desplegar el mismo commit, que puede no existir más (por ejemplo, después de limpiar el historial). Usar **Deploy Latest Commit** o hacer un commit vacío (`git commit --allow-empty`) y push.
-6. Si se agrega una dependencia nueva, hacer `npm install <paquete>` en la carpeta correspondiente y subir `package.json` y `package-lock.json` juntos. Si falta, el deploy falla con `Cannot find package`. Dependencias recientes: `node-cron` y `xlsx` (0.18.5).
+6. Si se agrega una dependencia nueva, hacer `npm install <paquete>` en la carpeta correspondiente y subir `package.json` y `package-lock.json` juntos. Si falta, el deploy falla con `Cannot find package`. Dependencias recientes: `node-cron` y `xlsx`.
+7. **`xlsx` no se actualiza desde npm:** SheetJS dejó de publicar ahí y la última versión de npm (0.18.5) tiene vulnerabilidades. Se instala desde su CDN: `npm install https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz` (en `backend`). Para una versión nueva, cambiar el número en esa dirección (ver docs.sheetjs.com).
 
 ## Backups
 Railway Pro: backups diarios (se guardan 6 días), semanales (27 días) y mensuales (89 días) del MySQL de producción. Los términos y la política de privacidad hablan de un plazo aproximado de 90 días.
@@ -340,4 +344,4 @@ Restaurar: servicio MySQL → Backups → elegir fecha → Restore → revisar �
 La versión vigente de los términos y del aviso de privacidad está en `src/utils/legal.js` y debe coincidir con `LEGAL_VERSION` del frontend. Hoy es un borrador (`2026-10-borrador-1`) pendiente de revisión legal. La casilla de contacto es `hola@talarix.com.ar`.
 
 ---
-Última actualización: 23/10/2026 (sesiones, límites de intentos y contraseñas).
+Última actualización: 23/10/2026 (librería xlsx, límites de importación y recuperación del superadmin).

@@ -47,7 +47,12 @@ export const errorMiddleware = (err, req, res, next) => {
   }
 
   if (err.name === 'MulterError') {
-    return res.status(400).json({ message: err.message });
+    const messages = {
+      LIMIT_FILE_SIZE: 'El archivo supera los 5 MB. Dividilo en archivos más chicos.',
+      LIMIT_FILE_COUNT: 'Subí un solo archivo por vez.',
+      LIMIT_UNEXPECTED_FILE: 'Subí un solo archivo por vez.',
+    };
+    return res.status(400).json({ message: messages[err.code] || 'No se pudo recibir el archivo' });
   }
 
   const status = err.status || 500;

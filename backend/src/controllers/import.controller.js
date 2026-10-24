@@ -31,7 +31,7 @@ export const importProducts = asyncHandler(async (req, res) => {
     throw error;
   }
 
-  const rows = parseSpreadsheet(req.file.buffer);
+  const rows = parseSpreadsheet(req.file);
   const categories = await Category.findAll({ where: { businessId: req.user.businessId } });
 
   const results = await processImport(rows, {
@@ -94,7 +94,7 @@ export const importCustomers = asyncHandler(async (req, res) => {
     throw error;
   }
 
-  const rows = parseSpreadsheet(req.file.buffer);
+  const rows = parseSpreadsheet(req.file);
 
   const results = await processImport(rows, {
     mapRow: (row) => ({
@@ -128,7 +128,7 @@ export const importSuppliers = asyncHandler(async (req, res) => {
     throw error;
   }
 
-  const rows = parseSpreadsheet(req.file.buffer);
+  const rows = parseSpreadsheet(req.file);
 
   const results = await processImport(rows, {
     mapRow: (row) => ({
