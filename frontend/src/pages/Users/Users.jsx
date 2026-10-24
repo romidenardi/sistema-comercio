@@ -66,6 +66,8 @@ const UsersContent = ({ notice, setNotice, reload }) => {
     defaultValues: DEFAULT_CREATE,
   });
   const editForm = useForm();
+  // Se lee acá, siempre, para que el formulario avise los errores de la fila que se está editando
+  const { errors: editErrors } = editForm.formState;
   const mode = watch('mode');
 
   const onCreate = async (formData) => {
@@ -250,8 +252,8 @@ const UsersContent = ({ notice, setNotice, reload }) => {
                             placeholder="Dejar vacío para no cambiarla"
                             {...editForm.register('password', { validate: validateOptionalPassword })}
                           />
-                          {editForm.formState.errors.password && (
-                            <span className="error">{editForm.formState.errors.password.message}</span>
+                          {editErrors.password && (
+                            <span className="error">{editErrors.password.message}</span>
                           )}
                         </div>
                         <div className="field">
